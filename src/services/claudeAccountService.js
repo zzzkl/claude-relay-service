@@ -473,7 +473,11 @@ class ClaudeAccountService {
               windowEnd: null,
               progress: 0,
               remainingTime: null,
-              lastRequestTime: null
+              lastRequestTime: null,
+              windowUsage: {
+                totalTokens: 0,
+                requests: 0
+              }
             },
             // 添加调度状态
             schedulable: account.schedulable !== 'false' // 默认为true，兼容历史数据
@@ -1288,6 +1292,72 @@ class ClaudeAccountService {
     return endTime
   }
 
+  // 📊 获取会话窗口内的使用统计
+  async getSessionWindowUsage(accountId, windowStart, windowEnd) {
+    try {
+      // 会话窗口时间是 UTC 格式，需要转换为本地时区
+      const config = require('../../config/config')
+      const timezoneOffset = config.system.timezoneOffset || 8 // 默认东八区
+      
+      const startHour = new Date(windowStart)
+      startHour.setMinutes(0, 0, 0)
+      const endHour = new Date(windowEnd)
+      
+      let totalTokens = 0
+      let totalRequests = 0
+      
+      // 遍历窗口内的每个小时
+      const currentHour = new Date(startHour)
+      while (currentHour <= endHour) {
+        // 将 UTC 时间转换为本地时区
+        const localTime = new Date(currentHour.getTime() + timezoneOffset * 60 * 60 * 1000)
+        
+        const year = localTime.getUTCFullYear()
+        const month = String(localTime.getUTCMonth() + 1).padStart(2, '0')
+        const day = String(localTime.getUTCDate()).padStart(2, '0')
+        const hour = String(localTime.getUTCHours()).padStart(2, '0')
+        
+        const dateStr = `${year}-${month}-${day}`
+        const hourlyKey = `account_usage:hourly:${accountId}:${dateStr}:${hour}`
+        
+        logger.debug(`🔍 Checking hourly usage key: ${hourlyKey}`)
+        
+        // 获取该小时的使用统计
+        const hourlyData = await redis.getClient().hgetall(hourlyKey)
+        if (hourlyData && hourlyData.totalTokens) {
+          const tokens = parseInt(hourlyData.totalTokens) || 0
+          const requests = parseInt(hourlyData.totalRequests) || 0
+          totalTokens += tokens
+          totalRequests += requests
+          logger.debug(`📊 Found usage for ${hourlyKey}: ${tokens} tokens, ${requests} requests`)
+        } else if (hourlyData && hourlyData.allTokens) {
+          // 兼容旧数据格式
+          const tokens = parseInt(hourlyData.allTokens) || 0
+          const requests = parseInt(hourlyData.totalRequests) || 0
+          totalTokens += tokens
+          totalRequests += requests
+          logger.debug(`📊 Found usage (old format) for ${hourlyKey}: ${tokens} tokens, ${requests} requests`)
+        }
+        
+        // 移动到下一个小时
+        currentHour.setHours(currentHour.getHours() + 1)
+      }
+      
+      logger.info(`📊 Session window usage for account ${accountId}: ${totalTokens} tokens, ${totalRequests} requests`)
+      
+      return {
+        totalTokens,
+        requests: totalRequests
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to get session window usage for account ${accountId}:`, error)
+      return {
+        totalTokens: 0,
+        requests: 0
+      }
+    }
+  }
+
   // 📊 获取会话窗口信息
   async getSessionWindowInfo(accountId) {
     try {
@@ -1304,7 +1374,11 @@ class ClaudeAccountService {
           windowEnd: null,
           progress: 0,
           remainingTime: null,
-          lastRequestTime: accountData.lastRequestTime || null
+          lastRequestTime: accountData.lastRequestTime || null,
+          windowUsage: {
+            totalTokens: 0,
+            requests: 0
+          }
         }
       }
 
@@ -1312,6 +1386,9 @@ class ClaudeAccountService {
       const windowStart = new Date(accountData.sessionWindowStart)
       const windowEnd = new Date(accountData.sessionWindowEnd)
       const currentTime = now.getTime()
+
+      // 获取会话窗口内的使用统计
+      const windowUsage = await this.getSessionWindowUsage(accountId, windowStart, windowEnd)
 
       // 检查窗口是否已过期
       if (currentTime >= windowEnd.getTime()) {
@@ -1321,7 +1398,8 @@ class ClaudeAccountService {
           windowEnd: accountData.sessionWindowEnd,
           progress: 100,
           remainingTime: 0,
-          lastRequestTime: accountData.lastRequestTime || null
+          lastRequestTime: accountData.lastRequestTime || null,
+          windowUsage
         }
       }
 
@@ -1339,7 +1417,8 @@ class ClaudeAccountService {
         windowEnd: accountData.sessionWindowEnd,
         progress,
         remainingTime,
-        lastRequestTime: accountData.lastRequestTime || null
+        lastRequestTime: accountData.lastRequestTime || null,
+        windowUsage
       }
     } catch (error) {
       logger.error(`❌ Failed to get session window info for account ${accountId}:`, error)

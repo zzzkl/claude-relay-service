@@ -473,6 +473,19 @@
                         )
                       }}
                     </div>
+                    <div v-if="account.sessionWindow.windowUsage" class="font-medium text-blue-600">
+                      已用:
+                      {{ formatNumber(account.sessionWindow.windowUsage.totalTokens || 0) }} tokens
+                    </div>
+                    <div
+                      v-if="
+                        account.sessionWindow.windowUsage &&
+                        account.sessionWindow.windowUsage.requests > 0
+                      "
+                      class="text-gray-500"
+                    >
+                      {{ account.sessionWindow.windowUsage.requests }} 次请求
+                    </div>
                     <div
                       v-if="account.sessionWindow.remainingTime > 0"
                       class="font-medium text-indigo-600"
@@ -654,22 +667,29 @@
                   :style="{ width: account.sessionWindow.progress + '%' }"
                 />
               </div>
-              <div class="flex items-center justify-between text-xs">
-                <span class="text-gray-500">
+              <div class="space-y-1 text-xs">
+                <div class="text-gray-500">
                   {{
                     formatSessionWindow(
                       account.sessionWindow.windowStart,
                       account.sessionWindow.windowEnd
                     )
                   }}
-                </span>
-                <span
+                </div>
+                <div v-if="account.sessionWindow.windowUsage" class="font-medium text-blue-600">
+                  已用:
+                  {{ formatNumber(account.sessionWindow.windowUsage.totalTokens || 0) }} tokens
+                  <span v-if="account.sessionWindow.windowUsage.requests > 0" class="text-gray-500">
+                    ({{ account.sessionWindow.windowUsage.requests }} 次)
+                  </span>
+                </div>
+                <div
                   v-if="account.sessionWindow.remainingTime > 0"
                   class="font-medium text-indigo-600"
                 >
                   剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}
-                </span>
-                <span v-else class="text-gray-500"> 已结束 </span>
+                </div>
+                <div v-else class="text-gray-500">已结束</div>
               </div>
             </div>
 
