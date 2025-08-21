@@ -1,6 +1,19 @@
 # Claude Relay Service Makefile
 # 功能完整的 AI API 中转服务，支持 Claude 和 Gemini 双平台
 
+# 版本管理
+VERSION := $(shell cat VERSION | tr -d '\n')
+IMAGE_NAME := claude-relay-service
+FULL_IMAGE := $(IMAGE_NAME):$(VERSION)
+LATEST_IMAGE := $(IMAGE_NAME):latest
+DEV_IMAGE := $(IMAGE_NAME):dev
+
+# 颜色定义
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+RED := \033[0;31m
+NC := \033[0m # No Color
+
 .PHONY: help install setup dev start test lint clean docker-up docker-down service-start service-stop service-status logs cli-admin cli-keys cli-accounts cli-status
 
 # 默认目标：显示帮助信息
@@ -98,6 +111,36 @@ test:
 lint:
 	@echo "🔍 执行代码风格检查..."
 	npm run lint
+
+# 版本管理命令
+version:
+	@echo "$(GREEN)当前版本: $(VERSION)$(NC)"
+
+test-build:
+	@echo "$(YELLOW)测试构建 Docker 镜像...$(NC)"
+	@docker build -t $(IMAGE_NAME):test-$(shell date +%s) .
+	@echo "$(GREEN)✓ 测试构建成功$(NC)"
+
+build:
+	@echo "$(YELLOW)构建 Docker 镜像: $(FULL_IMAGE)$(NC)"
+	@docker build -t $(FULL_IMAGE) -t $(LATEST_IMAGE) .
+	@echo "$(GREEN)✓ 构建成功: $(FULL_IMAGE) 和 $(LATEST_IMAGE)$(NC)"
+
+build-dev:
+	@echo "$(YELLOW)构建开发版 Docker 镜像: $(DEV_IMAGE)$(NC)"
+	@docker build -t $(DEV_IMAGE) .
+	@echo "$(GREEN)✓ 构建成功: $(DEV_IMAGE)$(NC)"
+
+safe-rebuild: test-build
+	@echo "$(YELLOW)测试构建成功，开始正式构建...$(NC)"
+	@$(MAKE) build
+	@echo "$(YELLOW)停止现有服务...$(NC)"
+	@docker-compose down
+	@echo "$(YELLOW)更新 docker-compose.yml 使用新版本...$(NC)"
+	@sed -i 's|image: $(IMAGE_NAME):.*|image: $(FULL_IMAGE)|' docker-compose.yml
+	@echo "$(YELLOW)启动新版本服务...$(NC)"
+	@docker-compose up -d
+	@echo "$(GREEN)✓ 服务已使用新版本 $(VERSION) 重新启动$(NC)"
 
 # Docker 部署
 docker-up:

@@ -38,12 +38,16 @@ class ApiKeyService {
     const apiKey = `${this.prefix}${this._generateSecretKey()}`
     const keyId = uuidv4()
     const hashedKey = this._hashApiKey(apiKey)
+    
+    // 生成 key 预览（前4位 + 后4位）
+    const keyPreview = `${apiKey.slice(0, 4)}****${apiKey.slice(-4)}`
 
     const keyData = {
       id: keyId,
       name,
       description,
       apiKey: hashedKey,
+      keyPreview,  // 保存预览信息
       tokenLimit: String(tokenLimit ?? 0),
       concurrencyLimit: String(concurrencyLimit ?? 0),
       rateLimitWindow: String(rateLimitWindow ?? 0),
@@ -75,6 +79,7 @@ class ApiKeyService {
     return {
       id: keyId,
       apiKey, // 只在创建时返回完整的key
+      keyPreview: keyData.keyPreview, // 返回预览信息
       name: keyData.name,
       description: keyData.description,
       tokenLimit: parseInt(keyData.tokenLimit),
@@ -586,6 +591,32 @@ class ApiKeyService {
       .createHash('sha256')
       .update(apiKey + config.security.encryptionKey)
       .digest('hex')
+  }
+
+  // 🔄 为现有的API Keys添加预览信息（迁移工具）
+  async migrateAddKeyPreviews() {
+    try {
+      const apiKeys = await redis.getAllApiKeys()
+      let migratedCount = 0
+      
+      for (const key of apiKeys) {
+        // 如果没有keyPreview字段，添加一个默认的标记
+        if (!key.keyPreview) {
+          const keyData = {
+            ...key,
+            keyPreview: '(旧密钥-无预览)' // 标记为旧的密钥
+          }
+          await redis.setApiKey(key.id, keyData)
+          migratedCount++
+        }
+      }
+      
+      logger.info(`✅ 迁移完成：为 ${migratedCount} 个API Key添加了预览信息`)
+      return { migratedCount }
+    } catch (error) {
+      logger.error('❌ 迁移失败:', error)
+      throw error
+    }
   }
 
   // 📈 获取使用统计

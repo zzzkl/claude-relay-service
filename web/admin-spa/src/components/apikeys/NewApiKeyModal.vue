@@ -52,6 +52,16 @@
             </div>
           </div>
 
+          <div v-if="apiKey.keyPreview">
+            <label class="mb-2 block text-sm font-semibold text-gray-700">Key 标识</label>
+            <div class="rounded-lg border bg-gray-50 p-3">
+              <span class="font-mono text-gray-700">
+                <i class="fas fa-fingerprint mr-2 text-gray-400" />
+                {{ apiKey.keyPreview }}
+              </span>
+            </div>
+          </div>
+
           <div v-if="apiKey.description">
             <label class="mb-2 block text-sm font-semibold text-gray-700">备注</label>
             <div class="rounded-lg border bg-gray-50 p-3">

@@ -265,6 +265,25 @@
                       <div class="truncate text-xs text-gray-500" :title="key.id">
                         {{ key.id }}
                       </div>
+                      <!-- 显示 Key 预览 -->
+                      <div v-if="key.keyPreview" class="mt-0.5 truncate text-xs text-gray-600">
+                        <button
+                          class="inline-flex items-center transition-colors hover:text-gray-800"
+                          type="button"
+                          @click.stop="toggleKeyPreview(key.id)"
+                        >
+                          <i
+                            :class="[
+                              'fas mr-1 text-gray-400',
+                              visibleKeyPreviews.has(key.id) ? 'fa-eye-slash' : 'fa-eye'
+                            ]"
+                          />
+                          <span v-if="visibleKeyPreviews.has(key.id)" class="font-mono">
+                            {{ key.keyPreview }}
+                          </span>
+                          <span v-else class="text-gray-500">点击查看标识</span>
+                        </button>
+                      </div>
                       <!-- 账户绑定信息 -->
                       <div class="mt-1.5 space-y-1">
                         <!-- Claude 绑定 -->
@@ -802,6 +821,25 @@
                 <p class="mt-0.5 text-xs text-gray-500">
                   {{ key.id }}
                 </p>
+                <!-- 显示 Key 预览 -->
+                <div v-if="key.keyPreview" class="mt-0.5 text-xs text-gray-600">
+                  <button
+                    class="inline-flex items-center transition-colors hover:text-gray-800"
+                    type="button"
+                    @click.stop="toggleKeyPreview(key.id)"
+                  >
+                    <i
+                      :class="[
+                        'fas mr-1 text-gray-400',
+                        visibleKeyPreviews.has(key.id) ? 'fa-eye-slash' : 'fa-eye'
+                      ]"
+                    />
+                    <span v-if="visibleKeyPreviews.has(key.id)" class="font-mono">
+                      {{ key.keyPreview }}
+                    </span>
+                    <span v-else class="text-gray-500">点击查看标识</span>
+                  </button>
+                </div>
               </div>
             </div>
             <span
@@ -1203,6 +1241,8 @@ const apiKeysLoading = ref(false)
 const apiKeyStatsTimeRange = ref('today')
 const apiKeysSortBy = ref('')
 const apiKeysSortOrder = ref('asc')
+// 密钥预览显示状态
+const visibleKeyPreviews = ref(new Set())
 const expandedApiKeys = ref({})
 const apiKeyModelStats = ref({})
 const apiKeyDateFilters = ref({})
@@ -1584,6 +1624,17 @@ const isApiKeyExpiringSoon = (expiresAt) => {
 const formatExpireDate = (dateString) => {
   if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('zh-CN')
+}
+
+// 切换密钥预览显示状态
+const toggleKeyPreview = (keyId) => {
+  const newSet = new Set(visibleKeyPreviews.value)
+  if (newSet.has(keyId)) {
+    newSet.delete(keyId)
+  } else {
+    newSet.add(keyId)
+  }
+  visibleKeyPreviews.value = newSet
 }
 
 // 切换模型统计展开状态
