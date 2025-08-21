@@ -706,6 +706,15 @@ function createUsageTrendChart() {
   const requestsData = data.map((d) => d.requests || 0)
   const costData = data.map((d) => d.cost || 0)
 
+  // 计算总Token数
+  const totalTokensData = data.map(
+    (d) =>
+      (d.inputTokens || 0) +
+      (d.outputTokens || 0) +
+      (d.cacheCreateTokens || 0) +
+      (d.cacheReadTokens || 0)
+  )
+
   // 根据数据类型确定标签字段和格式
   const labelField = data[0]?.date ? 'date' : 'hour'
   const labels = data.map((d) => {
@@ -736,6 +745,15 @@ function createUsageTrendChart() {
   const chartData = {
     labels: labels,
     datasets: [
+      {
+        label: '总Token',
+        data: totalTokensData,
+        borderColor: 'rgb(251, 191, 36)',
+        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+        borderWidth: 3,
+        tension: 0.3,
+        order: 0 // 显示在最前面
+      },
       {
         label: '输入Token',
         data: inputData,
