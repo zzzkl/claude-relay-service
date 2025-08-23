@@ -1289,32 +1289,33 @@ class ClaudeAccountService {
   async getSessionWindowUsage(accountId, windowStart, windowEnd) {
     try {
       // 会话窗口时间是 UTC 格式，需要转换为本地时区
-      const config = require('../../config/config')
-      const timezoneOffset = config.system.timezoneOffset || 8 // 默认东八区
-      
+      const configData = require('../../config/config')
+      const timezoneOffset = configData.system.timezoneOffset || 8 // 默认东八区
+
       const startHour = new Date(windowStart)
       startHour.setMinutes(0, 0, 0)
       const endHour = new Date(windowEnd)
-      
+
       let totalTokens = 0
       let totalRequests = 0
-      
+      const modelDistribution = {} // 添加模型分布统计
+
       // 遍历窗口内的每个小时
       const currentHour = new Date(startHour)
       while (currentHour <= endHour) {
         // 将 UTC 时间转换为本地时区
         const localTime = new Date(currentHour.getTime() + timezoneOffset * 60 * 60 * 1000)
-        
+
         const year = localTime.getUTCFullYear()
         const month = String(localTime.getUTCMonth() + 1).padStart(2, '0')
         const day = String(localTime.getUTCDate()).padStart(2, '0')
         const hour = String(localTime.getUTCHours()).padStart(2, '0')
-        
+
         const dateStr = `${year}-${month}-${day}`
         const hourlyKey = `account_usage:hourly:${accountId}:${dateStr}:${hour}`
-        
+
         logger.debug(`🔍 Checking hourly usage key: ${hourlyKey}`)
-        
+
         // 获取该小时的使用统计
         const hourlyData = await redis.getClient().hgetall(hourlyKey)
         if (hourlyData && hourlyData.totalTokens) {
@@ -1329,18 +1330,56 @@ class ClaudeAccountService {
           const requests = parseInt(hourlyData.totalRequests) || 0
           totalTokens += tokens
           totalRequests += requests
-          logger.debug(`📊 Found usage (old format) for ${hourlyKey}: ${tokens} tokens, ${requests} requests`)
+          logger.debug(
+            `📊 Found usage (old format) for ${hourlyKey}: ${tokens} tokens, ${requests} requests`
+          )
         }
-        
+
+        // 获取模型分布统计 - 动态扫描所有模型
+        // 搜索该小时内所有模型的使用数据
+        const modelPattern = `account_usage:model:hourly:${accountId}:*:${dateStr}:${hour}`
+        const modelKeys = await redis.getClient().keys(modelPattern)
+
+        for (const modelKey of modelKeys) {
+          // 从键名中提取模型名称
+          // 格式: account_usage:model:hourly:{accountId}:{model}:{date}:{hour}
+          const parts = modelKey.split(':')
+          const model = parts[4] // 第5个部分是模型名
+
+          const modelData = await redis.getClient().hgetall(modelKey)
+          if (modelData && (modelData.totalTokens || modelData.allTokens)) {
+            const modelTokens = parseInt(modelData.totalTokens || modelData.allTokens) || 0
+            const modelRequests = parseInt(modelData.totalRequests) || 0
+
+            if (modelTokens > 0) {
+              if (!modelDistribution[model]) {
+                modelDistribution[model] = {
+                  tokens: 0,
+                  requests: 0
+                }
+              }
+              modelDistribution[model].tokens += modelTokens
+              modelDistribution[model].requests += modelRequests
+              logger.debug(
+                `📊 Found model usage for ${model}: ${modelTokens} tokens, ${modelRequests} requests`
+              )
+            }
+          }
+        }
+
         // 移动到下一个小时
         currentHour.setHours(currentHour.getHours() + 1)
       }
-      
-      logger.info(`📊 Session window usage for account ${accountId}: ${totalTokens} tokens, ${totalRequests} requests`)
-      
+
+      logger.info(
+        `📊 Session window usage for account ${accountId}: ${totalTokens} tokens, ${totalRequests} requests`
+      )
+      logger.info(`📊 Model distribution:`, modelDistribution)
+
       return {
         totalTokens,
-        requests: totalRequests
+        requests: totalRequests,
+        modelDistribution // 返回模型分布数据
       }
     } catch (error) {
       logger.error(`❌ Failed to get session window usage for account ${accountId}:`, error)
@@ -1370,7 +1409,8 @@ class ClaudeAccountService {
           lastRequestTime: accountData.lastRequestTime || null,
           windowUsage: {
             totalTokens: 0,
-            requests: 0
+            requests: 0,
+            modelDistribution: {}
           }
         }
       }

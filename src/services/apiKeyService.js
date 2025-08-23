@@ -38,7 +38,7 @@ class ApiKeyService {
     const apiKey = `${this.prefix}${this._generateSecretKey()}`
     const keyId = uuidv4()
     const hashedKey = this._hashApiKey(apiKey)
-    
+
     // 生成 key 预览（前4位 + 后4位）
     const keyPreview = `${apiKey.slice(0, 4)}****${apiKey.slice(-4)}`
 
@@ -47,7 +47,7 @@ class ApiKeyService {
       name,
       description,
       apiKey: hashedKey,
-      keyPreview,  // 保存预览信息
+      keyPreview, // 保存预览信息
       tokenLimit: String(tokenLimit ?? 0),
       concurrencyLimit: String(concurrencyLimit ?? 0),
       rateLimitWindow: String(rateLimitWindow ?? 0),
@@ -598,7 +598,7 @@ class ApiKeyService {
     try {
       const apiKeys = await redis.getAllApiKeys()
       let migratedCount = 0
-      
+
       for (const key of apiKeys) {
         // 如果没有keyPreview字段，添加一个默认的标记
         if (!key.keyPreview) {
@@ -610,7 +610,7 @@ class ApiKeyService {
           migratedCount++
         }
       }
-      
+
       logger.info(`✅ 迁移完成：为 ${migratedCount} 个API Key添加了预览信息`)
       return { migratedCount }
     } catch (error) {

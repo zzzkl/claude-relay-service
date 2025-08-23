@@ -13,7 +13,12 @@
     </div>
 
     <div
-      v-if="dashboardStore.dashboardModelStats.length === 0"
+      v-if="
+        dashboardStore.dashboardModelStats.length === 0 ||
+        sortedStats.every(
+          (stat) => stat.requests === 0 && (stat.allTokens === 0 || stat.allTokens === undefined)
+        )
+      "
       class="py-12 text-center text-gray-500"
     >
       <i class="fas fa-chart-pie mb-3 text-4xl opacity-30" />
@@ -39,7 +44,7 @@
           </div>
           <div class="text-right">
             <p class="font-semibold text-gray-800">{{ formatNumber(stat.requests) }} 请求</p>
-            <p class="text-sm text-gray-500">{{ formatNumber(stat.totalTokens) }} tokens</p>
+            <p class="text-sm text-gray-500">{{ formatNumber(stat.allTokens) }} tokens</p>
           </div>
         </div>
       </div>
@@ -61,7 +66,12 @@ let chart = null
 const modelPeriod = ref('daily')
 
 const sortedStats = computed(() => {
-  return [...dashboardStore.dashboardModelStats].sort((a, b) => b.requests - a.requests)
+  return [...dashboardStore.dashboardModelStats].sort((a, b) => {
+    // 当requests为0时，按allTokens排序
+    const aValue = a.requests > 0 ? a.requests : a.allTokens || 0
+    const bValue = b.requests > 0 ? b.requests : b.allTokens || 0
+    return bValue - aValue
+  })
 })
 
 const getColor = (index) => {
@@ -86,7 +96,10 @@ const createChart = () => {
       labels: sortedStats.value.map((stat) => stat.model),
       datasets: [
         {
-          data: sortedStats.value.map((stat) => stat.requests),
+          data: sortedStats.value.map((stat) => {
+            // 当requests为0时，使用allTokens显示饼图
+            return stat.requests > 0 ? stat.requests : stat.allTokens || 0
+          }),
           backgroundColor: sortedStats.value.map((_, index) => colors[index % colors.length]),
           borderWidth: 0
         }
@@ -103,15 +116,16 @@ const createChart = () => {
           callbacks: {
             label: function (context) {
               const stat = sortedStats.value[context.dataIndex]
-              const percentage = (
-                (stat.requests /
-                  dashboardStore.dashboardModelStats.reduce((sum, s) => sum + s.requests, 0)) *
-                100
-              ).toFixed(1)
+              const dataValue = stat.requests > 0 ? stat.requests : stat.allTokens || 0
+              const totalValue = dashboardStore.dashboardModelStats.reduce((sum, s) => {
+                return sum + (s.requests > 0 ? s.requests : s.allTokens || 0)
+              }, 0)
+              const percentage =
+                totalValue > 0 ? ((dataValue / totalValue) * 100).toFixed(1) : '0.0'
               return [
                 `${stat.model}: ${percentage}%`,
                 `请求: ${formatNumber(stat.requests)}`,
-                `Tokens: ${formatNumber(stat.totalTokens)}`
+                `Tokens: ${formatNumber(stat.allTokens)}`
               ]
             }
           }

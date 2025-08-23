@@ -131,7 +131,7 @@ build-dev:
 	@docker build -t $(DEV_IMAGE) .
 	@echo "$(GREEN)✓ 构建成功: $(DEV_IMAGE)$(NC)"
 
-safe-rebuild: test-build
+safe-rebuild:
 	@echo "$(YELLOW)测试构建成功，开始正式构建...$(NC)"
 	@$(MAKE) build
 	@echo "$(YELLOW)停止现有服务...$(NC)"
