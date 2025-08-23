@@ -119,7 +119,7 @@
           <thead class="bg-gray-50/80 backdrop-blur-sm dark:bg-gray-700/80">
             <tr>
               <th
-                class="w-[22%] min-w-[180px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                class="w-[20%] min-w-[180px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('name')"
               >
                 名称
@@ -134,7 +134,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[15%] min-w-[120px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                class="w-[13%] min-w-[120px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('platform')"
               >
                 平台/类型
@@ -149,7 +149,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[12%] min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                class="w-[10%] min-w-[100px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('status')"
               >
                 状态
@@ -164,7 +164,7 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[8%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+                class="w-[7%] min-w-[80px] cursor-pointer px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
                 @click="sortAccounts('priority')"
               >
                 优先级
@@ -179,22 +179,22 @@
                 <i v-else class="fas fa-sort ml-1 text-gray-400" />
               </th>
               <th
-                class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                class="w-[9%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 代理
               </th>
               <th
-                class="w-[10%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                class="w-[8%] min-w-[90px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 今日使用
               </th>
               <th
-                class="w-[10%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                class="w-[11%] min-w-[100px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 会话窗口
               </th>
               <th
-                class="w-[8%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
+                class="w-[7%] min-w-[80px] px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300"
               >
                 最后使用
               </th>
@@ -375,119 +375,81 @@
                         "
                         >({{ account.rateLimitStatus.minutesRemaining }}分钟)</span
                       >
-                  </span>
-                  <span
-                    v-if="account.schedulable === false"
-                    class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
-                  >
-                    <i class="fas fa-pause-circle mr-1" />
-                    不可调度
-                  </span>
-                  <span
-                    v-if="account.status === 'blocked' && account.errorMessage"
-                    class="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400"
-                    :title="account.errorMessage"
-                  >
-                    {{ account.errorMessage }}
-                  </span>
-                  <span
-                    v-if="account.accountType === 'dedicated'"
-                    class="text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    绑定: {{ account.boundApiKeysCount || 0 }} 个API Key
-                  </span>
-                </div>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4">
-                <div
-                  v-if="
-                    account.platform === 'claude' ||
-                    account.platform === 'claude-console' ||
-                    account.platform === 'bedrock' ||
-                    account.platform === 'gemini' ||
-                    account.platform === 'openai'
-                  "
-                  class="flex items-center gap-2"
-                >
-                  <div class="h-2 w-16 rounded-full bg-gray-200">
-                    <div
-                      class="h-2 rounded-full bg-gradient-to-r from-green-500 to-blue-600 transition-all duration-300"
-                      :style="{ width: 101 - (account.priority || 50) + '%' }"
-                    />
-                  </div>
-                  <span class="min-w-[20px] text-xs font-medium text-gray-700 dark:text-gray-200">
-                    {{ account.priority || 50 }}
-                  </span>
-                </div>
-                <div v-else class="text-sm text-gray-400">
-                  <span class="text-xs">N/A</span>
-                </div>
-              </td>
-              <td class="px-3 py-4 text-sm text-gray-600">
-                <div
-                  v-if="formatProxyDisplay(account.proxy)"
-                  class="break-all rounded bg-blue-50 px-2 py-1 font-mono text-xs"
-                  :title="formatProxyDisplay(account.proxy)"
-                >
-                  {{ formatProxyDisplay(account.proxy) }}
-                </div>
-                <div v-else class="text-gray-400">无代理</div>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm">
-                <div v-if="account.usage && account.usage.daily" class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <div class="h-2 w-2 rounded-full bg-green-500" />
-                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100"
-                      >{{ account.usage.daily.requests || 0 }} 次</span
+                    </span>
+                    <span
+                      v-if="account.schedulable === false"
+                      class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
                     >
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <div class="h-2 w-2 rounded-full bg-blue-500" />
-                    <span class="text-xs text-gray-600 dark:text-gray-300"
-                      >{{ formatNumber(account.usage.daily.allTokens || 0) }} tokens</span
+                      <i class="fas fa-pause-circle mr-1" />
+                      不可调度
+                    </span>
+                    <span
+                      v-if="account.status === 'blocked' && account.errorMessage"
+                      class="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400"
+                      :title="account.errorMessage"
                     >
-                  </div>
-                  <div
-                    v-if="account.usage.averages && account.usage.averages.rpm > 0"
-                    class="text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    平均 {{ account.usage.averages.rpm.toFixed(2) }} RPM
-                  </div>
-                </div>
-                <div v-else class="text-xs text-gray-400">暂无数据</div>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4">
-                <div
-                  v-if="
-                    account.platform === 'claude' &&
-                    account.sessionWindow &&
-                    account.sessionWindow.hasActiveWindow
-                  "
-                  class="space-y-2"
-                >
-                  <div class="flex items-center gap-2">
-                    <div class="h-2 w-24 rounded-full bg-gray-200">
-                      <div
-                        class="h-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
-                        :style="{ width: account.sessionWindow.progress + '%' }"
-                      />
-                    </div>
-                    <span class="min-w-[32px] text-xs font-medium text-gray-700 dark:text-gray-200">
-                      {{ account.sessionWindow.progress }}%
+                      {{ account.errorMessage }}
+                    </span>
+                    <span
+                      v-if="account.accountType === 'dedicated'"
+                      class="text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      绑定: {{ account.boundApiKeysCount || 0 }} 个API Key
                     </span>
                   </div>
-                  <div class="text-xs text-gray-600 dark:text-gray-300">
-                    <div>
-                      {{
-                        formatSessionWindow(
-                          account.sessionWindow.windowStart,
-                          account.sessionWindow.windowEnd
-                        )
-                      }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4">
+                  <div
+                    v-if="
+                      account.platform === 'claude' ||
+                      account.platform === 'claude-console' ||
+                      account.platform === 'bedrock' ||
+                      account.platform === 'gemini' ||
+                      account.platform === 'openai'
+                    "
+                    class="flex items-center gap-2"
+                  >
+                    <div class="h-2 w-16 rounded-full bg-gray-200">
+                      <div
+                        class="h-2 rounded-full bg-gradient-to-r from-green-500 to-blue-600 transition-all duration-300"
+                        :style="{ width: 101 - (account.priority || 50) + '%' }"
+                      />
+                    </div>
+                    <span class="min-w-[20px] text-xs font-medium text-gray-700 dark:text-gray-200">
+                      {{ account.priority || 50 }}
+                    </span>
+                  </div>
+                  <div v-else class="text-sm text-gray-400">
+                    <span class="text-xs">N/A</span>
+                  </div>
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-600 dark:text-gray-300">
+                  <div
+                    v-if="formatProxyDisplay(account.proxy)"
+                    class="break-all rounded bg-blue-50 px-2 py-1 font-mono text-xs dark:bg-blue-900/30 dark:text-blue-300"
+                    :title="formatProxyDisplay(account.proxy)"
+                  >
+                    {{ formatProxyDisplay(account.proxy) }}
+                  </div>
+                  <div v-else class="text-gray-400 dark:text-gray-500">无代理</div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                  <div v-if="account.usage && account.usage.daily" class="space-y-1">
+                    <div class="flex items-center gap-2">
+                      <div class="h-2 w-2 rounded-full bg-green-500" />
+                      <span class="text-sm font-medium text-gray-900 dark:text-gray-100"
+                        >{{ account.usage.daily.requests || 0 }} 次</span
+                      >
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <div class="h-2 w-2 rounded-full bg-blue-500" />
+                      <span class="text-xs text-gray-600 dark:text-gray-300"
+                        >{{ formatNumber(account.usage.daily.allTokens || 0) }} tokens</span
+                      >
                     </div>
                     <div
                       v-if="account.usage.averages && account.usage.averages.rpm > 0"
-                      class="text-xs text-gray-500"
+                      class="text-xs text-gray-500 dark:text-gray-400"
                     >
                       平均 {{ account.usage.averages.rpm.toFixed(2) }} RPM
                     </div>
@@ -503,76 +465,89 @@
                     "
                     class="space-y-2"
                   >
+                    <!-- 进度条和百分比 -->
                     <div class="flex items-center gap-2">
-                      <div class="h-2 w-24 rounded-full bg-gray-200">
+                      <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-600">
                         <div
                           class="h-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
                           :style="{ width: account.sessionWindow.progress + '%' }"
                         />
                       </div>
-                      <span class="min-w-[32px] text-xs font-medium text-gray-700">
+                      <span
+                        class="min-w-[32px] text-xs font-medium text-gray-700 dark:text-gray-200"
+                      >
                         {{ account.sessionWindow.progress }}%
                       </span>
                     </div>
-                    <div class="text-xs text-gray-600">
-                      <div>
-                        {{
-                          formatSessionWindow(
-                            account.sessionWindow.windowStart,
-                            account.sessionWindow.windowEnd
-                          )
-                        }}
+
+                    <!-- 时间窗口信息 -->
+                    <div class="space-y-1 text-xs text-gray-600 dark:text-gray-300">
+                      <div class="flex items-center gap-1">
+                        <i class="fas fa-clock text-xs text-blue-500" />
+                        <span>
+                          {{
+                            formatSessionWindow(
+                              account.sessionWindow.windowStart,
+                              account.sessionWindow.windowEnd
+                            )
+                          }}
+                        </span>
                       </div>
+
+                      <!-- 剩余时间 -->
                       <div
-                        v-if="account.sessionWindow.windowUsage"
-                        class="font-medium text-blue-600"
+                        v-if="account.sessionWindow.remainingTime > 0"
+                        class="flex items-center gap-1 font-medium text-indigo-600 dark:text-indigo-400"
                       >
-                        已用:
-                        {{ formatNumber(account.sessionWindow.windowUsage.totalTokens || 0) }}
-                        tokens
+                        <i class="fas fa-hourglass-half text-xs" />
+                        <span
+                          >剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}</span
+                        >
                       </div>
+                      <div v-else class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                        <i class="fas fa-hourglass-end text-xs" />
+                        <span>已结束</span>
+                      </div>
+
+                      <!-- RPM 指示器 -->
+                      <div
+                        v-if="
+                          account.usage && account.usage.averages && account.usage.averages.rpm > 0
+                        "
+                        class="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"
+                      >
+                        <i class="fas fa-tachometer-alt text-xs" />
+                        <span>{{ account.usage.averages.rpm.toFixed(2) }} RPM</span>
+                      </div>
+
+                      <!-- 模型分布按钮 -->
                       <div
                         v-if="
                           account.sessionWindow.windowUsage &&
-                          account.sessionWindow.windowUsage.requests > 0
+                          account.sessionWindow.windowUsage.modelDistribution
                         "
-                        class="text-gray-500"
+                        class="mt-2"
                       >
-                        {{ account.sessionWindow.windowUsage.requests }} 次请求
-                      </div>
-                      <!-- 模型使用分布按钮 -->
-                      <div class="mt-2">
                         <button
-                          class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                          class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
                           @click.stop="toggleAccountModelStats(account.id)"
                         >
                           <i
                             :class="[
-                              'fas',
+                              'fas text-xs',
                               expandedAccountModelStats.has(account.id)
                                 ? 'fa-chevron-up'
                                 : 'fa-chevron-down'
                             ]"
                           />
-                          <span>模型使用分布</span>
+                          <span>模型</span>
                         </button>
-                      </div>
-                      <div
-                        v-if="account.sessionWindow.remainingTime > 0"
-                        class="font-medium text-indigo-600"
-                      >
-                        剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}
                       </div>
                     </div>
                   </div>
-                  <div v-else-if="account.platform === 'claude'" class="text-sm text-gray-400">
-                    <i class="fas fa-minus" />
-                  </div>
-                  <div v-else class="text-sm text-gray-400">
-                    <span class="text-xs">N/A</span>
-                  </div>
+                  <div v-else class="text-xs text-gray-400 dark:text-gray-500">暂无数据</div>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 dark:text-gray-300">
                   {{ formatLastUsed(account.lastUsedAt) }}
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm font-medium">
@@ -935,40 +910,84 @@
                 account.sessionWindow &&
                 account.sessionWindow.hasActiveWindow
               "
-              class="space-y-1.5 rounded-lg bg-gray-50 p-2 dark:bg-gray-700"
+              class="space-y-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-700"
             >
+              <!-- 标题和进度 -->
               <div class="flex items-center justify-between text-xs">
                 <span class="font-medium text-gray-600 dark:text-gray-300">会话窗口</span>
                 <span class="font-medium text-gray-700 dark:text-gray-200">
                   {{ account.sessionWindow.progress }}%
                 </span>
               </div>
+
+              <!-- 进度条 -->
               <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-600">
                 <div
                   class="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
                   :style="{ width: account.sessionWindow.progress + '%' }"
                 />
               </div>
-              <div class="space-y-1 text-xs">
-                <div class="text-gray-500 dark:text-gray-400">
-                  {{
-                    formatSessionWindow(
-                      account.sessionWindow.windowStart,
-                      account.sessionWindow.windowEnd
-                    )
-                  }}
+
+              <!-- 详细信息 -->
+              <div class="space-y-1.5 text-xs">
+                <!-- 时间窗口 -->
+                <div class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                  <i class="fas fa-clock text-xs text-blue-500" />
+                  <span>
+                    {{
+                      formatSessionWindow(
+                        account.sessionWindow.windowStart,
+                        account.sessionWindow.windowEnd
+                      )
+                    }}
+                  </span>
                 </div>
-                <div v-if="account.sessionWindow.windowUsage" class="font-medium text-blue-600">
+
+                <!-- 剩余时间 -->
+                <div
+                  v-if="account.sessionWindow.remainingTime > 0"
+                  class="flex items-center gap-1 font-medium text-indigo-600 dark:text-indigo-400"
+                >
+                  <i class="fas fa-hourglass-half text-xs" />
+                  <span>剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}</span>
+                </div>
+                <div v-else class="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                  <i class="fas fa-hourglass-end text-xs" />
+                  <span>已结束</span>
+                </div>
+
+                <!-- RPM 指示器 -->
+                <div
+                  v-if="account.usage && account.usage.averages && account.usage.averages.rpm > 0"
+                  class="flex items-center gap-1 text-green-600 dark:text-green-400"
+                >
+                  <i class="fas fa-tachometer-alt text-xs" />
+                  <span>{{ account.usage.averages.rpm.toFixed(2) }} RPM</span>
+                </div>
+
+                <!-- 已用tokens -->
+                <div
+                  v-if="account.sessionWindow.windowUsage"
+                  class="font-medium text-blue-600 dark:text-blue-400"
+                >
                   已用:
                   {{ formatNumber(account.sessionWindow.windowUsage.totalTokens || 0) }} tokens
-                  <span v-if="account.sessionWindow.windowUsage.requests > 0" class="text-gray-500">
+                  <span
+                    v-if="account.sessionWindow.windowUsage.requests > 0"
+                    class="text-gray-500 dark:text-gray-400"
+                  >
                     ({{ account.sessionWindow.windowUsage.requests }} 次)
                   </span>
                 </div>
-                <!-- 模型使用分布按钮 -->
-                <div class="mt-2">
+
+                <!-- 模型分布按钮 -->
+                <div class="mt-2 border-t border-gray-200 pt-2 dark:border-gray-600">
                   <button
-                    class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                    v-if="
+                      account.sessionWindow.windowUsage &&
+                      account.sessionWindow.windowUsage.modelDistribution
+                    "
+                    class="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
                     @click.stop="toggleAccountModelStats(account.id)"
                   >
                     <i
@@ -979,16 +998,9 @@
                           : 'fa-chevron-down'
                       ]"
                     />
-                    <span>查看模型分布</span>
+                    <span>模型</span>
                   </button>
                 </div>
-                <div
-                  v-if="account.sessionWindow.remainingTime > 0"
-                  class="font-medium text-indigo-600"
-                >
-                  剩余 {{ formatRemainingTime(account.sessionWindow.remainingTime) }}
-                </div>
-                <div v-else class="text-gray-500">已结束</div>
               </div>
             </div>
 
@@ -1808,7 +1820,8 @@ const toggleAccountModelStats = async (accountId) => {
     expandedAccountModelStats.value.delete(accountId)
   } else {
     expandedAccountModelStats.value.add(accountId)
-    await loadAccountModelStats(accountId)
+    // 首次展开时直接调用API获取完整数据（包括费用和token详细信息）
+    await loadAccountModelStats(accountId, true)
   }
 }
 
@@ -1818,30 +1831,36 @@ const loadAccountModelStats = async (accountId, forceReload = false) => {
     return
   }
 
-  // 首先尝试从会话窗口数据中获取模型分布
-  const account = accounts.value.find((acc) => acc.id === accountId)
-  if (
-    account &&
-    account.sessionWindow &&
-    account.sessionWindow.windowUsage &&
-    account.sessionWindow.windowUsage.modelDistribution
-  ) {
-    const modelDistribution = account.sessionWindow.windowUsage.modelDistribution
-    const modelStats = Object.entries(modelDistribution).map(([model, data]) => ({
-      model,
-      requests: data.requests || 0,
-      allTokens: data.tokens || 0,
-      inputTokens: 0, // 会话窗口数据中没有详细的input/output分解
-      outputTokens: 0,
-      cacheCreateTokens: 0,
-      cacheReadTokens: 0
-    }))
-    accountModelStats.value[accountId] = modelStats
-    accountModelStatsLoaded.value[accountId] = true
-    return
+  // 如果不是强制重载，首先尝试从会话窗口数据中获取模型分布
+  if (!forceReload) {
+    const account = accounts.value.find((acc) => acc.id === accountId)
+    if (
+      account &&
+      account.sessionWindow &&
+      account.sessionWindow.windowUsage &&
+      account.sessionWindow.windowUsage.modelDistribution
+    ) {
+      const modelDistribution = account.sessionWindow.windowUsage.modelDistribution
+      const modelStats = Object.entries(modelDistribution).map(([model, data]) => ({
+        model,
+        requests: data.requests || 0,
+        allTokens: data.tokens || 0,
+        inputTokens: 0, // 会话窗口数据中没有详细的input/output分解
+        outputTokens: 0,
+        cacheCreateTokens: 0,
+        cacheReadTokens: 0,
+        // 会话窗口数据作为后备方案，正常情况下会直接调用API
+        formatted: {
+          total: '$0.000000'
+        }
+      }))
+      accountModelStats.value[accountId] = modelStats
+      accountModelStatsLoaded.value[accountId] = true
+      return
+    }
   }
 
-  // 如果会话窗口中没有数据，则调用API
+  // 调用API获取最新数据
   accountModelStatsLoading.value[accountId] = true
 
   try {
