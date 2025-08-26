@@ -2,7 +2,7 @@ version: '3.8'
 services:
   claude-relay:
     build: .
-    image: claude-relay-service:1.1.118
+    image: claude-relay-service:1.1.120
     # pull_policy: always
     container_name: claude-relay-service
     restart: unless-stopped
