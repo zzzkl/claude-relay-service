@@ -192,6 +192,185 @@ function isTokenExpired(account) {
   return new Date(account.expiresAt) <= new Date()
 }
 
+// 🕐 计算会话窗口开始时间（整点）
+function _calculateSessionWindowStart(requestTime) {
+  const windowStart = new Date(requestTime)
+  windowStart.setMinutes(0)
+  windowStart.setSeconds(0)
+  windowStart.setMilliseconds(0)
+  return windowStart
+}
+
+// 🕐 计算会话窗口结束时间（+5小时）
+function _calculateSessionWindowEnd(startTime) {
+  const endTime = new Date(startTime)
+  endTime.setHours(endTime.getHours() + 5)
+  return endTime
+}
+
+// 🕐 更新会话窗口
+async function updateSessionWindow(accountId) {
+  const client = redisClient.getClientSafe()
+  const key = `${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`
+  const accountData = await client.hgetall(key)
+  if (!accountData || Object.keys(accountData).length === 0) {
+    throw new Error('Account not found')
+  }
+
+  const now = new Date()
+  const currentTime = now.getTime()
+
+  if (accountData.sessionWindowStart && accountData.sessionWindowEnd) {
+    const windowEnd = new Date(accountData.sessionWindowEnd).getTime()
+    if (currentTime < windowEnd) {
+      // 窗口内，仅更新最后请求时间
+      await client.hset(key, { lastRequestTime: now.toISOString() })
+      return {
+        ...accountData,
+        lastRequestTime: now.toISOString()
+      }
+    }
+  }
+
+  // 创建新的窗口：整点开始 + 5小时
+  const windowStart = _calculateSessionWindowStart(now)
+  const windowEnd = _calculateSessionWindowEnd(windowStart)
+
+  const updates = {
+    sessionWindowStart: windowStart.toISOString(),
+    sessionWindowEnd: windowEnd.toISOString(),
+    lastRequestTime: now.toISOString()
+  }
+  await client.hset(key, updates)
+
+  return { ...accountData, ...updates }
+}
+
+// 📊 获取会话窗口内的使用统计
+async function getSessionWindowUsage(accountId, windowStart, windowEnd) {
+  try {
+    const client = redisClient.getClientSafe()
+    const configData = require('../../config/config')
+    const timezoneOffset = configData.system.timezoneOffset || 8
+
+    const startHour = new Date(windowStart)
+    startHour.setMinutes(0, 0, 0)
+    const endHour = new Date(windowEnd)
+
+    let totalTokens = 0
+    let totalRequests = 0
+    const modelDistribution = {}
+
+    const currentHour = new Date(startHour)
+    while (currentHour <= endHour) {
+      const localTime = new Date(currentHour.getTime() + timezoneOffset * 60 * 60 * 1000)
+      const year = localTime.getUTCFullYear()
+      const month = String(localTime.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(localTime.getUTCDate()).padStart(2, '0')
+      const hour = String(localTime.getUTCHours()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
+
+      // 格式: account_usage:model:hourly:{accountId}:{model}:{date}:{hour}
+      const pattern = `account_usage:model:hourly:${accountId}:*:${dateStr}:${hour}`
+      const keys = await client.keys(pattern)
+
+      for (const key of keys) {
+        const match = key.match(/account_usage:model:hourly:[^:]+:([^:]+):\d{4}-\d{2}-\d{2}:\d{2}$/)
+        if (!match) {
+          continue
+        }
+        const model = match[1]
+        const data = await client.hgetall(key)
+        if (data && Object.keys(data).length > 0) {
+          const reqs = parseInt(data.totalRequests || data.requests || 0) || 0
+          const tokens = parseInt(data.totalTokens || data.allTokens || 0) || 0
+
+          totalRequests += reqs
+          totalTokens += tokens
+
+          if (!modelDistribution[model]) {
+            modelDistribution[model] = { requests: 0, tokens: 0 }
+          }
+          modelDistribution[model].requests += reqs
+          modelDistribution[model].tokens += tokens
+        }
+      }
+
+      currentHour.setHours(currentHour.getHours() + 1)
+    }
+
+    return {
+      totalTokens,
+      requests: totalRequests,
+      modelDistribution
+    }
+  } catch (error) {
+    logger.error(`❌ Failed to get session window usage for OpenAI account ${accountId}:`, error)
+    return { totalTokens: 0, requests: 0, modelDistribution: {} }
+  }
+}
+
+// 📊 获取会话窗口信息
+async function getSessionWindowInfo(accountId) {
+  try {
+    const client = redisClient.getClientSafe()
+    const key = `${OPENAI_ACCOUNT_KEY_PREFIX}${accountId}`
+    const accountData = await client.hgetall(key)
+    if (!accountData || Object.keys(accountData).length === 0) {
+      return null
+    }
+
+    if (!accountData.sessionWindowStart || !accountData.sessionWindowEnd) {
+      return {
+        hasActiveWindow: false,
+        windowStart: null,
+        windowEnd: null,
+        progress: 0,
+        remainingTime: null,
+        lastRequestTime: accountData.lastRequestTime || null,
+        windowUsage: { totalTokens: 0, requests: 0, modelDistribution: {} }
+      }
+    }
+
+    const now = new Date()
+    const windowStart = new Date(accountData.sessionWindowStart)
+    const windowEnd = new Date(accountData.sessionWindowEnd)
+    const currentTime = now.getTime()
+
+    const windowUsage = await getSessionWindowUsage(accountId, windowStart, windowEnd)
+
+    if (currentTime >= windowEnd.getTime()) {
+      return {
+        hasActiveWindow: false,
+        windowStart: accountData.sessionWindowStart,
+        windowEnd: accountData.sessionWindowEnd,
+        progress: 100,
+        remainingTime: 0,
+        lastRequestTime: accountData.lastRequestTime || null,
+        windowUsage
+      }
+    }
+
+    const totalDuration = windowEnd.getTime() - windowStart.getTime()
+    const elapsedTime = currentTime - windowStart.getTime()
+    const progress = Math.round((elapsedTime / totalDuration) * 100)
+    const remainingTime = Math.round((windowEnd.getTime() - currentTime) / (1000 * 60))
+
+    return {
+      hasActiveWindow: true,
+      windowStart: accountData.sessionWindowStart,
+      windowEnd: accountData.sessionWindowEnd,
+      progress,
+      remainingTime,
+      lastRequestTime: accountData.lastRequestTime || null,
+      windowUsage
+    }
+  } catch (error) {
+    logger.error(`❌ Failed to get session window info for OpenAI account ${accountId}:`, error)
+    return null
+  }
+}
+
 // 刷新账户的 access token
 async function refreshAccountToken(accountId) {
   const account = await getAccount(accountId)
@@ -499,6 +678,14 @@ async function getAllAccounts() {
         }
       }
 
+      // 获取会话窗口信息
+      let sessionWindowInfo = null
+      try {
+        sessionWindowInfo = await getSessionWindowInfo(accountData.id)
+      } catch (e) {
+        sessionWindowInfo = null
+      }
+
       // 不解密敏感字段，只返回基本信息
       accounts.push({
         ...accountData,
@@ -522,7 +709,21 @@ async function getAllAccounts() {
               isRateLimited: false,
               rateLimitedAt: null,
               minutesRemaining: 0
-            }
+            },
+        // 添加会话窗口信息
+        sessionWindow: sessionWindowInfo || {
+          hasActiveWindow: false,
+          windowStart: null,
+          windowEnd: null,
+          progress: 0,
+          remainingTime: null,
+          lastRequestTime: null,
+          windowUsage: {
+            totalTokens: 0,
+            requests: 0,
+            modelDistribution: {}
+          }
+        }
       })
     }
   }
@@ -707,6 +908,13 @@ async function updateAccountUsage(accountId, tokens = 0) {
   }
 
   await updateAccount(accountId, updates)
+
+  // 更新会话窗口（基于最近使用）
+  try {
+    await updateSessionWindow(accountId)
+  } catch (e) {
+    logger.debug(`Failed to update OpenAI session window for ${accountId}: ${e.message}`)
+  }
 }
 
 // 为了兼容性，保留recordUsage作为updateAccountUsage的别名
@@ -729,5 +937,9 @@ module.exports = {
   encrypt,
   decrypt,
   generateEncryptionKey,
-  decryptCache // 暴露缓存对象以便测试和监控
+  decryptCache, // 暴露缓存对象以便测试和监控
+  // 新增：会话窗口能力导出
+  updateSessionWindow,
+  getSessionWindowInfo,
+  getSessionWindowUsage
 }

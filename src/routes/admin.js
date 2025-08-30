@@ -5140,13 +5140,26 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
       accounts.map(async (account) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
+
+          // 会话窗口信息（与 Claude 一致的结构）
+          const sessionWindow = account.sessionWindow || {
+            hasActiveWindow: false,
+            windowStart: null,
+            windowEnd: null,
+            progress: 0,
+            remainingTime: null,
+            lastRequestTime: null,
+            windowUsage: { totalTokens: 0, requests: 0, modelDistribution: {} }
+          }
+
           return {
             ...account,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
               monthly: usageStats.monthly
-            }
+            },
+            sessionWindow
           }
         } catch (error) {
           logger.debug(`Failed to get usage stats for OpenAI account ${account.id}:`, error)
@@ -5175,6 +5188,126 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
       message: '获取账户列表失败',
       error: error.message
     })
+  }
+})
+
+// 获取 OpenAI 账户会话窗口内的模型使用统计（对齐 Claude 的接口）
+router.get('/openai-accounts/:accountId/model-stats', authenticateAdmin, async (req, res) => {
+  try {
+    const { accountId } = req.params
+    logger.info(`📊 Getting model stats for OpenAI account: ${accountId}`)
+
+    // 获取账户信息
+    const client = redis.getClientSafe()
+    const accountKey = `openai:account:${accountId}`
+    const accountData = await client.hgetall(accountKey)
+    if (!accountData || Object.keys(accountData).length === 0) {
+      return res.status(404).json({ error: 'Account not found' })
+    }
+
+    // 检查是否有活跃的会话窗口
+    if (!accountData.sessionWindowStart || !accountData.sessionWindowEnd) {
+      return res.json({ success: true, data: [], message: 'No active session window' })
+    }
+
+    const windowStart = new Date(accountData.sessionWindowStart)
+    const windowEnd = new Date(accountData.sessionWindowEnd)
+    const now = new Date()
+
+    if (now >= windowEnd) {
+      return res.json({ success: true, data: [], message: 'Session window expired' })
+    }
+
+    const configData = require('../../config/config')
+    const timezoneOffset = configData.system.timezoneOffset || 8
+
+    const modelStatsMap = new Map()
+    const startHour = new Date(windowStart)
+    startHour.setMinutes(0, 0, 0)
+    const endHour = new Date(windowEnd)
+    const currentHour = new Date(startHour)
+
+    while (currentHour <= endHour) {
+      const localTime = new Date(currentHour.getTime() + timezoneOffset * 60 * 60 * 1000)
+      const year = localTime.getUTCFullYear()
+      const month = String(localTime.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(localTime.getUTCDate()).padStart(2, '0')
+      const hour = String(localTime.getUTCHours()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
+
+      const pattern = `account_usage:model:hourly:${accountId}:*:${dateStr}:${hour}`
+      const keys = await redis.getClient().keys(pattern)
+
+      for (const key of keys) {
+        const match = key.match(/account_usage:model:hourly:[^:]+:([^:]+):\d{4}-\d{2}-\d{2}:\d{2}$/)
+        if (!match) {
+          continue
+        }
+        const model = match[1]
+        const data = await redis.getClient().hgetall(key)
+        if (data && Object.keys(data).length > 0) {
+          if (!modelStatsMap.has(model)) {
+            modelStatsMap.set(model, {
+              requests: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              cacheCreateTokens: 0,
+              cacheReadTokens: 0,
+              allTokens: 0
+            })
+          }
+          const stats = modelStatsMap.get(model)
+          stats.requests += parseInt(data.totalRequests || data.requests || 0) || 0
+          stats.inputTokens += parseInt(data.inputTokens || 0) || 0
+          stats.outputTokens += parseInt(data.outputTokens || 0) || 0
+          stats.cacheCreateTokens += parseInt(data.cacheCreateTokens || 0) || 0
+          stats.cacheReadTokens += parseInt(data.cacheReadTokens || 0) || 0
+          stats.allTokens += parseInt(data.totalTokens || data.allTokens || 0) || 0
+        }
+      }
+
+      currentHour.setHours(currentHour.getHours() + 1)
+    }
+
+    const modelStats = []
+    for (const [model, stats] of modelStatsMap) {
+      const usage = {
+        input_tokens: stats.inputTokens,
+        output_tokens: stats.outputTokens,
+        cache_creation_input_tokens: stats.cacheCreateTokens,
+        cache_read_input_tokens: stats.cacheReadTokens
+      }
+      const costData = CostCalculator.calculateCost(usage, model)
+
+      modelStats.push({
+        model,
+        requests: stats.requests,
+        inputTokens: stats.inputTokens,
+        outputTokens: stats.outputTokens,
+        cacheCreateTokens: stats.cacheCreateTokens,
+        cacheReadTokens: stats.cacheReadTokens,
+        allTokens: stats.allTokens,
+        costs: costData.costs,
+        formatted: costData.formatted,
+        pricing: costData.pricing,
+        usingDynamicPricing: costData.usingDynamicPricing
+      })
+    }
+
+    modelStats.sort((a, b) => b.allTokens - a.allTokens)
+
+    return res.json({
+      success: true,
+      data: modelStats,
+      windowInfo: {
+        windowStart: accountData.sessionWindowStart,
+        windowEnd: accountData.sessionWindowEnd,
+        progress: Math.round(((now - windowStart) / (windowEnd - windowStart)) * 100)
+      }
+    })
+  } catch (error) {
+    logger.error('❌ Failed to get OpenAI account model stats:', error)
+    return res.status(500).json({ error: 'Failed to get model stats', message: error.message })
   }
 })
 

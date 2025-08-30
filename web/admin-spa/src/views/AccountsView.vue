@@ -459,7 +459,7 @@
                 <td class="whitespace-nowrap px-3 py-4">
                   <div
                     v-if="
-                      account.platform === 'claude' &&
+                      (account.platform === 'claude' || account.platform === 'openai') &&
                       account.sessionWindow &&
                       account.sessionWindow.hasActiveWindow
                     "
@@ -906,7 +906,7 @@
             <!-- 会话窗口 -->
             <div
               v-if="
-                account.platform === 'claude' &&
+                (account.platform === 'claude' || account.platform === 'openai') &&
                 account.sessionWindow &&
                 account.sessionWindow.hasActiveWindow
               "
@@ -1864,7 +1864,10 @@ const loadAccountModelStats = async (accountId, forceReload = false) => {
   accountModelStatsLoading.value[accountId] = true
 
   try {
-    const response = await apiClient.get(`/admin/claude-accounts/${accountId}/model-stats`)
+    const account = accounts.value.find((acc) => acc.id === accountId)
+    const endpointBase =
+      account && account.platform === 'openai' ? 'openai-accounts' : 'claude-accounts'
+    const response = await apiClient.get(`/admin/${endpointBase}/${accountId}/model-stats`)
     if (response.success) {
       accountModelStats.value[accountId] = response.data || []
       accountModelStatsLoaded.value[accountId] = true
