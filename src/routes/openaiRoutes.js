@@ -96,6 +96,14 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
 
     const isStream = req.body?.stream !== false // 默认为流式（兼容现有行为）
 
+    // 读取请求中的 reasoning.effort（仅 gpt-5 与 o-series 支持）
+    const requestedReasoningEffort = req.body?.reasoning?.effort || null
+    if (requestedReasoningEffort) {
+      logger.info(`🧠 Requested reasoning.effort: ${requestedReasoningEffort}`)
+    } else {
+      logger.debug('🧠 No reasoning.effort requested')
+    }
+
     // 判断是否为 Codex CLI 的请求
     const isCodexCLI = req.body?.instructions?.startsWith(
       'You are a coding agent running in the Codex CLI'
@@ -196,9 +204,17 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
       res.setHeader('Cache-Control', 'no-cache')
       res.setHeader('Connection', 'keep-alive')
       res.setHeader('X-Accel-Buffering', 'no')
+      // 回传请求的 reasoning.effort（实际值仅在解析到上游事件后可获知，见日志）
+      if (requestedReasoningEffort) {
+        res.setHeader('x-reasoning-effort-requested', requestedReasoningEffort)
+      }
     } else {
       // 非流式响应头
       res.setHeader('Content-Type', 'application/json')
+      // 回传请求的 reasoning.effort（非必填）
+      if (requestedReasoningEffort) {
+        res.setHeader('x-reasoning-effort-requested', requestedReasoningEffort)
+      }
     }
 
     // 透传关键诊断头，避免传递不安全或与传输相关的头
@@ -217,11 +233,12 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
       }
     }
 
-    // 处理响应并捕获 usage 数据和真实的 model
+    // 处理响应并捕获 usage 数据、真实的 model 以及上游 reasoning.effort
     let buffer = ''
     let usageData = null
     let actualModel = null
     let usageReported = false
+    let actualReasoningEffort = null
 
     if (!isStream) {
       // 非流式响应处理
@@ -234,6 +251,17 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
         // 从响应中获取实际的 model 和 usage
         actualModel = responseData.model || requestedModel || 'gpt-4'
         usageData = responseData.usage
+
+        // 捕获上游返回的 reasoning.effort（兼容不同结构）
+        actualReasoningEffort =
+          responseData?.response?.reasoning?.effort || responseData?.reasoning?.effort || null
+        if (actualReasoningEffort) {
+          logger.info(`🧠 Upstream reasoning.effort (non-stream): ${actualReasoningEffort}`)
+          // 在非流式中可通过响应头带回
+          res.setHeader('x-reasoning-effort-actual', actualReasoningEffort)
+        } else {
+          logger.debug('🧠 Upstream did not include reasoning.effort (non-stream)')
+        }
 
         logger.debug(`📊 Non-stream response - Model: ${actualModel}, Usage:`, usageData)
 
@@ -285,6 +313,12 @@ router.post('/responses', authenticateApiKey, async (req, res) => {
           try {
             const jsonStr = line.slice(6) // 移除 'data: ' 前缀
             const eventData = JSON.parse(jsonStr)
+
+            // 捕获 earliest/actual reasoning.effort（优先 created，但 completed 也可）
+            if (eventData.response?.reasoning?.effort && !actualReasoningEffort) {
+              actualReasoningEffort = eventData.response.reasoning.effort
+              logger.info(`🧠 Upstream reasoning.effort (stream): ${actualReasoningEffort}`)
+            }
 
             // 检查是否是 response.completed 事件
             if (eventData.type === 'response.completed' && eventData.response) {
