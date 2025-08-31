@@ -686,8 +686,8 @@ async function getAllAccounts() {
         sessionWindowInfo = null
       }
 
-      // 不解密敏感字段，只返回基本信息
-      accounts.push({
+      // 构建账户对象
+      const accountObj = {
         ...accountData,
         openaiOauth: accountData.openaiOauth ? '[ENCRYPTED]' : '',
         accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
@@ -724,7 +724,19 @@ async function getAllAccounts() {
             modelDistribution: {}
           }
         }
-      })
+      }
+
+      // 为前端兼容性添加 usage.sessionWindow 字段
+      if (sessionWindowInfo && sessionWindowInfo.windowUsage) {
+        accountObj.usage = accountObj.usage || {}
+        accountObj.usage.sessionWindow = {
+          totalTokens: sessionWindowInfo.windowUsage.totalTokens || 0,
+          totalCost: 0 // OpenAI 暂时不计算费用
+        }
+      }
+
+      // 不解密敏感字段，只返回基本信息
+      accounts.push(accountObj)
     }
   }
 

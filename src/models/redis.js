@@ -1462,6 +1462,48 @@ class RedisClient {
       }
       const results = await pipeline.exec()
 
+      // 额外获取模型级别的数据
+      const modelKeys = []
+      const currentModelHour = new Date(startDate)
+      currentModelHour.setMinutes(0)
+      currentModelHour.setSeconds(0)
+      currentModelHour.setMilliseconds(0)
+
+      while (currentModelHour <= endDate) {
+        const tzDateStr = getDateStringInTimezone(currentModelHour)
+        const tzHour = String(getHourInTimezone(currentModelHour)).padStart(2, '0')
+        const pattern = `account_usage:model:hourly:${accountId}:*:${tzDateStr}:${tzHour}`
+        const keys = await this.client.keys(pattern)
+        modelKeys.push(...keys)
+        currentModelHour.setHours(currentModelHour.getHours() + 1)
+      }
+
+      // 获取所有模型数据
+      const modelDataMap = {}
+      for (const key of modelKeys) {
+        const parts = key.split(':')
+        const modelName = parts[4]
+        const hourData = await this.client.hgetall(key)
+
+        if (!modelDataMap[modelName]) {
+          modelDataMap[modelName] = {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheCreateTokens: 0,
+            cacheReadTokens: 0,
+            allTokens: 0,
+            requests: 0
+          }
+        }
+
+        modelDataMap[modelName].inputTokens += parseInt(hourData.inputTokens || 0)
+        modelDataMap[modelName].outputTokens += parseInt(hourData.outputTokens || 0)
+        modelDataMap[modelName].cacheCreateTokens += parseInt(hourData.cacheCreateTokens || 0)
+        modelDataMap[modelName].cacheReadTokens += parseInt(hourData.cacheReadTokens || 0)
+        modelDataMap[modelName].allTokens += parseInt(hourData.allTokens || 0)
+        modelDataMap[modelName].requests += parseInt(hourData.requests || 0)
+      }
+
       // 聚合所有数据
       let totalInputTokens = 0
       let totalOutputTokens = 0
@@ -1473,9 +1515,14 @@ class RedisClient {
 
       logger.debug(`   Processing ${results.length} hourly results`)
 
-      for (const [error, data] of results) {
+      for (const [idx, [error, data]] of results.entries()) {
         if (error || !data || Object.keys(data).length === 0) {
           continue
+        }
+
+        // Debug log the first result to see the structure
+        if (idx === 0 && Object.keys(data).length > 0) {
+          logger.debug(`   First hourly data sample:`, JSON.stringify(Object.keys(data)))
         }
 
         // 处理总计数据
@@ -1505,6 +1552,11 @@ class RedisClient {
             if (parts.length >= 3) {
               const modelName = parts[1]
               const metric = parts.slice(2).join(':')
+
+              // Debug log model data
+              if (!modelUsage[modelName]) {
+                logger.debug(`   Found model data for: ${modelName}`)
+              }
 
               if (!modelUsage[modelName]) {
                 modelUsage[modelName] = {
@@ -1550,7 +1602,7 @@ class RedisClient {
         totalCacheReadTokens,
         totalAllTokens,
         totalRequests,
-        modelUsage
+        modelUsage: modelDataMap // Use the model data from separate keys
       }
     } catch (error) {
       logger.error(`❌ Failed to get session window usage for account ${accountId}:`, error)

@@ -1512,11 +1512,17 @@ router.get('/claude-accounts', authenticateAdmin, async (req, res) => {
               account.sessionWindow.windowEnd
             )
 
+            logger.debug(`📊 Window usage for account ${account.id}:`, JSON.stringify(windowUsage))
+            logger.debug(`📊 Window usage modelUsage:`, JSON.stringify(windowUsage.modelUsage))
+
             // 计算会话窗口的总费用
             let totalCost = 0
             const modelCosts = {}
 
-            for (const [modelName, usage] of Object.entries(windowUsage.modelUsage)) {
+            // 注意：Redis返回的是modelUsage，但claudeAccountService返回的是modelDistribution
+            const modelData = windowUsage.modelUsage || windowUsage.modelDistribution || {}
+
+            for (const [modelName, usage] of Object.entries(modelData)) {
               const usageData = {
                 input_tokens: usage.inputTokens,
                 output_tokens: usage.outputTokens,
