@@ -5332,7 +5332,7 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
         try {
           const usageStats = await redis.getAccountUsageStats(account.id)
 
-          // 会话窗口信息（与 Claude 一致的结构）
+          // 会话窗口信息（保持与 Claude 对齐）
           const sessionWindow = account.sessionWindow || {
             hasActiveWindow: false,
             windowStart: null,
@@ -5343,12 +5343,50 @@ router.get('/openai-accounts', authenticateAdmin, async (req, res) => {
             windowUsage: { totalTokens: 0, requests: 0, modelDistribution: {} }
           }
 
+          // 计算会话窗口期内的 tokens 与费用（如有活动窗口）
+          let sessionWindowUsage = null
+          if (sessionWindow && sessionWindow.hasActiveWindow) {
+            try {
+              const windowUsage = await redis.getAccountSessionWindowUsage(
+                account.id,
+                sessionWindow.windowStart,
+                sessionWindow.windowEnd
+              )
+
+              // 费用合计（基于模型明细，若缺少明细则为0）
+              let totalCost = 0
+              const modelData = windowUsage.modelUsage || {}
+              for (const [modelName, usage] of Object.entries(modelData)) {
+                const usageData = {
+                  input_tokens: usage.inputTokens || 0,
+                  output_tokens: usage.outputTokens || 0,
+                  cache_creation_input_tokens: usage.cacheCreateTokens || 0,
+                  cache_read_input_tokens: usage.cacheReadTokens || 0
+                }
+                const costResult = CostCalculator.calculateCost(usageData, modelName)
+                totalCost += costResult.costs?.total || 0
+              }
+
+              sessionWindowUsage = {
+                totalTokens: windowUsage.totalAllTokens || 0,
+                totalRequests: windowUsage.totalRequests || 0,
+                totalCost
+              }
+            } catch (e) {
+              logger.debug(
+                `Failed calculating OpenAI session window usage for ${account.id}: ${e.message}`
+              )
+            }
+          }
+
           return {
             ...account,
             usage: {
               daily: usageStats.daily,
               total: usageStats.total,
-              monthly: usageStats.monthly
+              monthly: usageStats.monthly,
+              // 注入窗口期使用汇总，便于前端统一展示
+              sessionWindow: sessionWindowUsage
             },
             sessionWindow
           }

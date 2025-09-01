@@ -14,7 +14,7 @@ YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m # No Color
 
-.PHONY: help install setup dev start test lint clean docker-up docker-down service-start service-stop service-status logs cli-admin cli-keys cli-accounts cli-status
+.PHONY: help install setup dev start test lint lint-web lint-all format format-web format-all clean docker-up docker-down service-start service-stop service-status logs cli-admin cli-keys cli-accounts cli-status
 
 # 默认目标：显示帮助信息
 help:
@@ -31,12 +31,17 @@ help:
 	@echo "  🎨 前端构建："
 	@echo "    build-web      - 构建 Web 管理界面"
 	@echo "    build-all      - 构建完整项目（后端+前端）"
+	@echo "    lint-web       - Web 代码风格检查 (ESLint)"
+	@echo "    format-web     - Web 代码格式化 (Prettier)"
 	@echo ""
 	@echo "  🚀 开发和运行："
 	@echo "    dev            - 开发模式运行（热重载）"
 	@echo "    start          - 生产模式运行"
 	@echo "    test           - 运行测试套件"
-	@echo "    lint           - 代码风格检查"
+	@echo "    lint           - 代码风格检查（后端）"
+	@echo "    lint-all       - 代码风格检查（后端+前端）"
+	@echo "    format         - 格式化代码（后端，ESLint --fix）"
+	@echo "    format-all     - 格式化代码（后端+前端）"
 	@echo ""
 	@echo "  🐳 Docker 部署："
 	@echo "    docker-up      - 启动 Docker 服务"
@@ -111,6 +116,11 @@ test:
 lint:
 	@echo "🔍 执行代码风格检查..."
 	npm run lint
+
+# Web 前端：ESLint 修复
+lint-web:
+	@echo "🔍 执行 Web 代码风格检查..."
+	cd web/admin-spa && npm run lint
 
 # 版本管理命令
 version:
@@ -265,6 +275,19 @@ tail-logs:
 format:
 	@echo "🎨 格式化代码..."
 	npm run lint -- --fix
+
+# Web 前端：Prettier 格式化
+format-web:
+	@echo "🎨 格式化 Web 代码..."
+	cd web/admin-spa && npm run format
+
+# 汇总：后端+前端 Lint
+lint-all: lint lint-web
+	@echo "✅ Lint 全部完成"
+
+# 汇总：后端+前端 Format
+format-all: format format-web
+	@echo "✅ Format 全部完成"
 
 check-deps:
 	@echo "🔍 检查依赖更新..."

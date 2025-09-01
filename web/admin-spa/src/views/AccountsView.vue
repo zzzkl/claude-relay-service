@@ -494,9 +494,9 @@
                     </div>
                     <div class="flex items-center gap-2">
                       <div class="h-2 w-2 rounded-full bg-blue-500" />
-                      <span class="text-xs text-gray-600 dark:text-gray-300"
-                        >{{ formatNumber(account.usage.daily.allTokens || 0) }} tokens</span
-                      >
+                      <span class="text-xs text-gray-600 dark:text-gray-300">{{
+                        formatTokenCount(account.usage.daily.allTokens || 0)
+                      }}</span>
                     </div>
                     <div
                       v-if="account.usage.averages && account.usage.averages.rpm > 0"
@@ -551,7 +551,7 @@
                       <div class="flex items-center gap-1">
                         <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
                         <span class="font-medium text-gray-900 dark:text-gray-100">
-                          {{ formatNumber(account.usage.sessionWindow.totalTokens) }}M
+                          {{ formatTokenCount(account.usage.sessionWindow.totalTokens || 0) }}
                         </span>
                       </div>
                       <div class="flex items-center gap-1">
@@ -978,7 +978,7 @@
                 <div class="flex items-center gap-1.5">
                   <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
                   <p class="text-xs text-gray-600 dark:text-gray-400">
-                    {{ formatNumber(account.usage?.daily?.allTokens || 0) }}M
+                    {{ formatTokenCount(account.usage?.daily?.allTokens || 0) }}
                   </p>
                 </div>
                 <div class="flex items-center gap-1.5">
@@ -995,7 +995,7 @@
                 <div class="flex items-center gap-1.5">
                   <div class="h-1.5 w-1.5 rounded-full bg-purple-500" />
                   <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {{ formatNumber(account.usage.sessionWindow.totalTokens) }}M
+                    {{ formatTokenCount(account.usage.sessionWindow.totalTokens || 0) }}
                   </p>
                 </div>
                 <div class="flex items-center gap-1.5">
@@ -1092,7 +1092,7 @@
                   class="font-medium text-blue-600 dark:text-blue-400"
                 >
                   已用:
-                  {{ formatNumber(account.sessionWindow.windowUsage.totalTokens || 0) }} tokens
+                  {{ formatTokenCount(account.sessionWindow.windowUsage.totalTokens || 0) }}
                   <span
                     v-if="account.sessionWindow.windowUsage.requests > 0"
                     class="text-gray-500 dark:text-gray-400"
@@ -1641,17 +1641,7 @@ const sortAccounts = (field) => {
   }
 }
 
-// 格式化数字（与原版保持一致）
-const formatNumber = (num) => {
-  if (num === null || num === undefined) return '0'
-  const number = Number(num)
-  if (number >= 1000000) {
-    return (number / 1000000).toFixed(2)
-  } else if (number >= 1000) {
-    return (number / 1000000).toFixed(4)
-  }
-  return (number / 1000000).toFixed(6)
-}
+// 已统一使用 formatTokenCount 展示 K/M 单位
 
 // 格式化最后使用时间
 const formatLastUsed = (dateString) => {
