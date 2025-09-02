@@ -689,6 +689,8 @@ async function getAllAccounts() {
       // 构建账户对象
       const accountObj = {
         ...accountData,
+        isActive: accountData.isActive === 'true',
+        schedulable: accountData.schedulable !== 'false',
         openaiOauth: accountData.openaiOauth ? '[ENCRYPTED]' : '',
         accessToken: accountData.accessToken ? '[ENCRYPTED]' : '',
         refreshToken: accountData.refreshToken ? '[ENCRYPTED]' : '',
