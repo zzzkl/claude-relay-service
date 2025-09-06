@@ -39,6 +39,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Configure push auth (optional PAT)
+        id: auth
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_WORKFLOW }}
+          PAT_USER: ${{ secrets.PAT_USER }}
+        run: |
+          if [ -n "$PAT_TOKEN" ]; then
+            USER="${PAT_USER:-${GITHUB_ACTOR}}"
+            git remote set-url origin "https://${USER}:${PAT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            echo "🔐 Using PAT for pushes (workflow scope)"
+            echo "using_pat=true" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️ No PAT provided, will push with GITHUB_TOKEN (may fail for commits touching .github/workflows)"
+            echo "using_pat=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Add upstream remote
         run: |
           # 上游仓库地址
@@ -125,10 +141,25 @@ jobs:
       - name: Sync upstream tags to fork
         run: |
           echo "🔖 Syncing tags from upstream -> origin"
-          # 先确保我们拉取到上游全部标签并清理已删除标签
+          # 更新本地的上游标签
           git fetch upstream --tags --force --prune
-          # 将标签推送到 fork（如上游移动了标签，使用 --force 覆盖）
-          git push origin --tags --force
+          
+          # 逐个推送，避免因单个标签失败导致整个步骤失败
+          FAILED_TAGS=()
+          SYNCED_TAGS=()
+          for tag in $(git tag -l | sort -V); do
+            if git push origin "refs/tags/$tag:refs/tags/$tag" --force; then
+              echo "✔️  pushed $tag"
+              SYNCED_TAGS+=("$tag")
+            else
+              echo "❌ failed $tag"
+              FAILED_TAGS+=("$tag")
+            fi
+          done
+          
+          echo "Synced tags: ${#SYNCED_TAGS[@]} | Failed: ${#FAILED_TAGS[@]}"
+          # 将失败标签写入临时文件，供汇总使用
+          printf "%s\n" "${FAILED_TAGS[@]}" > failed-tags.txt
 
       - name: Create sync report
         if: always()
@@ -138,6 +169,7 @@ jobs:
           echo "- **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
           echo "- **Updates Found**: ${{ steps.check.outputs.has_updates }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Target Branch**: ${{ steps.check.outputs.target_branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Using PAT**: ${{ steps.auth.outputs.using_pat }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ steps.check.outputs.has_updates }}" == "true" ]; then
@@ -150,4 +182,14 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             git tag -l | sort | tail -20 >> $GITHUB_STEP_SUMMARY || true
             echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -f failed-tags.txt ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Tags failed to push" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat failed-tags.txt | sed '/^$/d' >> $GITHUB_STEP_SUMMARY || true
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "If failures mention 'without workflows permission', add a PAT with 'workflow' scope as secret 'PAT_WORKFLOW' (and optional 'PAT_USER')." >> $GITHUB_STEP_SUMMARY
           fi
