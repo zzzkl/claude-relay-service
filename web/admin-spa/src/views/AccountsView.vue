@@ -706,11 +706,13 @@
               </tr>
               <!-- 展开的模型使用统计行 -->
               <tr v-if="expandedAccountModelStats.has(account.id)">
-                <td class="bg-gray-50 px-4 py-6" colspan="9">
-                  <div class="mx-4 rounded-lg bg-white p-6 shadow-inner">
+                <td class="bg-gray-50 px-4 py-6 dark:bg-gray-700" colspan="9">
+                  <div class="mx-4 rounded-lg bg-white p-6 shadow-inner dark:bg-gray-800">
                     <!-- 标题栏 -->
                     <div class="mb-4 flex items-center justify-between">
-                      <h5 class="flex items-center text-sm font-semibold text-gray-700">
+                      <h5
+                        class="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-200"
+                      >
                         <i class="fas fa-chart-pie mr-2 text-indigo-500" />
                         会话窗口模型使用分布（5小时）
                       </h5>
@@ -720,12 +722,12 @@
                             accountModelStats[account.id] &&
                             accountModelStats[account.id].length > 0
                           "
-                          class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500"
+                          class="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400"
                         >
                           {{ accountModelStats[account.id].length }} 个模型
                         </span>
                         <button
-                          class="ml-2 flex items-center gap-1 text-sm text-blue-500 transition-colors hover:text-blue-700"
+                          class="ml-2 flex items-center gap-1 text-sm text-blue-500 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                           title="刷新数据"
                           @click="loadAccountModelStats(account.id, true)"
                         >
@@ -742,8 +744,10 @@
 
                     <!-- 数据展示区域 -->
                     <div v-if="accountModelStatsLoading[account.id]" class="py-8 text-center">
-                      <i class="fas fa-spinner fa-spin mb-3 text-2xl text-gray-400" />
-                      <p class="text-sm text-gray-500">正在加载模型统计...</p>
+                      <i
+                        class="fas fa-spinner fa-spin mb-3 text-2xl text-gray-400 dark:text-gray-500"
+                      />
+                      <p class="text-sm text-gray-500 dark:text-gray-400">正在加载模型统计...</p>
                     </div>
                     <div
                       v-else-if="
@@ -752,23 +756,27 @@
                       class="py-8 text-center"
                     >
                       <div class="mb-3 flex items-center justify-center gap-2">
-                        <i class="fas fa-chart-line text-lg text-gray-400" />
-                        <p class="text-sm text-gray-500">暂无模型使用数据</p>
+                        <i class="fas fa-chart-line text-lg text-gray-400 dark:text-gray-500" />
+                        <p class="text-sm text-gray-500 dark:text-gray-400">暂无模型使用数据</p>
                       </div>
-                      <p class="text-xs text-gray-400">当前会话窗口内没有使用记录</p>
+                      <p class="text-xs text-gray-400 dark:text-gray-500">
+                        当前会话窗口内没有使用记录
+                      </p>
                     </div>
                     <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                       <div
                         v-for="stat in accountModelStats[account.id]"
                         :key="stat.model"
-                        class="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 transition-all duration-200 hover:border-indigo-300 hover:shadow-lg"
+                        class="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 transition-all duration-200 hover:border-indigo-300 hover:shadow-lg dark:border-gray-600 dark:from-gray-800 dark:to-gray-700 dark:hover:border-indigo-500"
                       >
                         <div class="mb-3 flex items-start justify-between">
                           <div class="flex-1">
-                            <span class="mb-1 block text-sm font-semibold text-gray-800">{{
-                              stat.model
-                            }}</span>
-                            <span class="rounded-full bg-blue-50 px-2 py-1 text-xs text-gray-500"
+                            <span
+                              class="mb-1 block text-sm font-semibold text-gray-800 dark:text-gray-100"
+                              >{{ stat.model }}</span
+                            >
+                            <span
+                              class="rounded-full bg-blue-50 px-2 py-1 text-xs text-gray-500 dark:bg-blue-900/30 dark:text-gray-400"
                               >{{ stat.requests }} 次请求</span
                             >
                           </div>
@@ -776,25 +784,27 @@
 
                         <div class="mb-3 space-y-2">
                           <div class="flex items-center justify-between text-sm">
-                            <span class="flex items-center text-gray-600">
+                            <span class="flex items-center text-gray-600 dark:text-gray-300">
                               <i class="fas fa-coins mr-1 text-xs text-yellow-500" />
                               总Token:
                             </span>
-                            <span class="font-semibold text-gray-900">{{
+                            <span class="font-semibold text-gray-900 dark:text-gray-100">{{
                               formatTokenCount(stat.allTokens)
                             }}</span>
                           </div>
                           <div class="flex items-center justify-between text-sm">
-                            <span class="flex items-center text-gray-600">
+                            <span class="flex items-center text-gray-600 dark:text-gray-300">
                               <i class="fas fa-dollar-sign mr-1 text-xs text-green-500" />
                               费用:
                             </span>
-                            <span class="font-semibold text-green-600">{{
+                            <span class="font-semibold text-green-600 dark:text-green-400">{{
                               calculateModelCost(stat)
                             }}</span>
                           </div>
-                          <div class="mt-2 border-t border-gray-100 pt-2">
-                            <div class="flex items-center justify-between text-xs text-gray-500">
+                          <div class="mt-2 border-t border-gray-100 pt-2 dark:border-gray-600">
+                            <div
+                              class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                            >
                               <span class="flex items-center">
                                 <i class="fas fa-arrow-down mr-1 text-green-500" />
                                 输入:
@@ -803,7 +813,9 @@
                                 formatTokenCount(stat.inputTokens)
                               }}</span>
                             </div>
-                            <div class="flex items-center justify-between text-xs text-gray-500">
+                            <div
+                              class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400"
+                            >
                               <span class="flex items-center">
                                 <i class="fas fa-arrow-up mr-1 text-blue-500" />
                                 输出:
@@ -814,7 +826,7 @@
                             </div>
                             <div
                               v-if="stat.cacheCreateTokens > 0"
-                              class="flex items-center justify-between text-xs text-purple-600"
+                              class="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400"
                             >
                               <span class="flex items-center">
                                 <i class="fas fa-save mr-1" />
@@ -826,7 +838,7 @@
                             </div>
                             <div
                               v-if="stat.cacheReadTokens > 0"
-                              class="flex items-center justify-between text-xs text-purple-600"
+                              class="flex items-center justify-between text-xs text-purple-600 dark:text-purple-400"
                             >
                               <span class="flex items-center">
                                 <i class="fas fa-download mr-1" />
@@ -840,7 +852,7 @@
                         </div>
 
                         <!-- 进度条 -->
-                        <div class="mt-3 h-2 w-full rounded-full bg-gray-200">
+                        <div class="mt-3 h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
                           <div
                             class="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-500"
                             :style="{
@@ -853,7 +865,7 @@
                           />
                         </div>
                         <div class="mt-1 text-right">
-                          <span class="text-xs font-medium text-indigo-600">
+                          <span class="text-xs font-medium text-indigo-600 dark:text-indigo-400">
                             {{
                               calculateAccountModelPercentage(
                                 stat.allTokens,
@@ -870,26 +882,28 @@
                       v-if="
                         accountModelStats[account.id] && accountModelStats[account.id].length > 0
                       "
-                      class="mt-4 rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 p-3"
+                      class="mt-4 rounded-lg border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 p-3 dark:border-indigo-700 dark:from-indigo-900/20 dark:to-purple-900/20"
                     >
                       <div class="flex items-center justify-between text-sm">
-                        <span class="flex items-center font-semibold text-gray-700">
+                        <span
+                          class="flex items-center font-semibold text-gray-700 dark:text-gray-300"
+                        >
                           <i class="fas fa-calculator mr-2 text-indigo-500" />
                           总计统计
                         </span>
                         <div class="flex gap-4 text-xs">
-                          <span class="text-gray-600">
+                          <span class="text-gray-600 dark:text-gray-400">
                             总请求:
-                            <span class="font-semibold text-gray-800">{{
+                            <span class="font-semibold text-gray-800 dark:text-gray-200">{{
                               accountModelStats[account.id].reduce(
                                 (sum, stat) => sum + stat.requests,
                                 0
                               )
                             }}</span>
                           </span>
-                          <span class="text-gray-600">
+                          <span class="text-gray-600 dark:text-gray-400">
                             总Token:
-                            <span class="font-semibold text-gray-800">{{
+                            <span class="font-semibold text-gray-800 dark:text-gray-200">{{
                               formatTokenCount(
                                 accountModelStats[account.id].reduce(
                                   (sum, stat) => sum + stat.allTokens,
