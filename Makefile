@@ -7,6 +7,8 @@ IMAGE_NAME := claude-relay-service
 FULL_IMAGE := $(IMAGE_NAME):$(VERSION)
 LATEST_IMAGE := $(IMAGE_NAME):latest
 DEV_IMAGE := $(IMAGE_NAME):dev
+# Git commit (short). Falls back to 'unknown' if git not available.
+GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 # 颜色定义
 GREEN := \033[0;32m
@@ -128,17 +130,20 @@ version:
 
 test-build:
 	@echo "$(YELLOW)测试构建 Docker 镜像...$(NC)"
-	@docker build -t $(IMAGE_NAME):test-$(shell date +%s) .
+	@echo "🔖 使用 GIT_COMMIT=$(GIT_COMMIT)"
+	@docker build --build-arg GIT_COMMIT=$(GIT_COMMIT) -t $(IMAGE_NAME):test-$(shell date +%s) .
 	@echo "$(GREEN)✓ 测试构建成功$(NC)"
 
 build:
 	@echo "$(YELLOW)构建 Docker 镜像: $(FULL_IMAGE)$(NC)"
-	@docker build -t $(FULL_IMAGE) -t $(LATEST_IMAGE) .
+	@echo "🔖 使用 GIT_COMMIT=$(GIT_COMMIT)"
+	@docker build --build-arg GIT_COMMIT=$(GIT_COMMIT) -t $(FULL_IMAGE) -t $(LATEST_IMAGE) .
 	@echo "$(GREEN)✓ 构建成功: $(FULL_IMAGE) 和 $(LATEST_IMAGE)$(NC)"
 
 build-dev:
 	@echo "$(YELLOW)构建开发版 Docker 镜像: $(DEV_IMAGE)$(NC)"
-	@docker build -t $(DEV_IMAGE) .
+	@echo "🔖 使用 GIT_COMMIT=$(GIT_COMMIT)"
+	@docker build --build-arg GIT_COMMIT=$(GIT_COMMIT) -t $(DEV_IMAGE) .
 	@echo "$(GREEN)✓ 构建成功: $(DEV_IMAGE)$(NC)"
 
 safe-rebuild:

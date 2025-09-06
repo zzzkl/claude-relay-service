@@ -18,9 +18,10 @@
           <template #after-title>
             <!-- 版本信息 -->
             <div class="flex items-center gap-1 sm:gap-2">
-              <span class="font-mono text-xs text-gray-400 dark:text-gray-500 sm:text-sm"
-                >v{{ versionInfo.current || '...' }}</span
-              >
+              <span class="font-mono text-xs text-gray-400 dark:text-gray-500 sm:text-sm">
+                v{{ versionInfo.current || '...' }}
+                <template v-if="versionInfo.commit"> ({{ versionInfo.commit }}) </template>
+              </span>
               <!-- 更新提示 -->
               <a
                 v-if="versionInfo.hasUpdate"
@@ -73,9 +74,10 @@
             <div class="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
               <div class="flex items-center justify-between text-sm">
                 <span class="text-gray-500 dark:text-gray-400">当前版本</span>
-                <span class="font-mono text-gray-700 dark:text-gray-300"
-                  >v{{ versionInfo.current || '...' }}</span
-                >
+                <span class="font-mono text-gray-700 dark:text-gray-300">
+                  v{{ versionInfo.current || '...'
+                  }}<template v-if="versionInfo.commit"> ({{ versionInfo.commit }})</template>
+                </span>
               </div>
               <div v-if="versionInfo.hasUpdate" class="mt-2">
                 <div class="mb-2 flex items-center justify-between text-sm">
@@ -287,6 +289,7 @@ const oemLoading = computed(() => authStore.oemLoading)
 // 版本信息
 const versionInfo = ref({
   current: '...',
+  commit: '',
   latest: '',
   hasUpdate: false,
   checkingUpdate: false,
@@ -323,6 +326,7 @@ const checkForUpdates = async () => {
       const data = result.data
 
       versionInfo.value.current = data.current
+      versionInfo.value.commit = data.commit || ''
       versionInfo.value.latest = data.latest
       versionInfo.value.hasUpdate = data.hasUpdate
       versionInfo.value.releaseInfo = data.releaseInfo
@@ -333,6 +337,7 @@ const checkForUpdates = async () => {
         'versionInfo',
         JSON.stringify({
           current: data.current,
+          commit: data.commit || '',
           latest: data.latest,
           lastChecked: versionInfo.value.lastChecked,
           hasUpdate: data.hasUpdate,
@@ -357,6 +362,7 @@ const checkForUpdates = async () => {
     if (cached) {
       const cachedInfo = JSON.parse(cached)
       versionInfo.value.current = cachedInfo.current || versionInfo.value.current
+      versionInfo.value.commit = cachedInfo.commit || versionInfo.value.commit || ''
       versionInfo.value.latest = cachedInfo.latest
       versionInfo.value.hasUpdate = cachedInfo.hasUpdate
       versionInfo.value.releaseInfo = cachedInfo.releaseInfo

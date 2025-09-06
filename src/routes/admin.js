@@ -16,6 +16,7 @@ const pricingService = require('../services/pricingService')
 const claudeCodeHeadersService = require('../services/claudeCodeHeadersService')
 const webhookNotifier = require('../utils/webhookNotifier')
 const axios = require('axios')
+const childProcess = require('child_process')
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
@@ -5174,6 +5175,65 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
     logger.warn('⚠️ Could not read VERSION file:', err.message)
   }
 
+  // 获取当前提交哈希（短哈希），优先从环境变量读取，回退到git命令与.git目录解析
+  const getCurrentCommit = () => {
+    try {
+      const envSha =
+        process.env.GIT_COMMIT ||
+        process.env.GIT_SHA ||
+        process.env.COMMIT_SHA ||
+        process.env.SOURCE_VERSION ||
+        process.env.VERCEL_GIT_COMMIT_SHA ||
+        process.env.HEROKU_SLUG_COMMIT ||
+        process.env.REVISION
+      if (envSha && typeof envSha === 'string') {
+        return envSha.substring(0, 7)
+      }
+
+      // 尝试使用 git 命令（在容器或无.git时可能不可用）
+      try {
+        const stdout = childProcess
+          .execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+          .toString()
+          .trim()
+        if (stdout) {
+          return stdout
+        }
+      } catch (e) {
+        // git may be unavailable (e.g., production image)
+        logger.debug('git rev-parse not available for commit detection')
+      }
+
+      // 尝试从 .git/HEAD 解析
+      try {
+        const gitDir = path.join(__dirname, '../../.git')
+        if (fs.existsSync(gitDir)) {
+          const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim()
+          if (head.startsWith('ref:')) {
+            const refPath = head.replace('ref: ', '').trim()
+            const refFullPath = path.join(gitDir, refPath)
+            if (fs.existsSync(refFullPath)) {
+              const sha = fs.readFileSync(refFullPath, 'utf8').trim()
+              if (sha) {
+                return sha.substring(0, 7)
+              }
+            }
+          } else if (/^[0-9a-f]{40}$/i.test(head)) {
+            return head.substring(0, 7)
+          }
+        }
+      } catch (e) {
+        // .git directory may not exist in production
+        logger.debug('Parsing .git/HEAD failed for commit detection')
+      }
+    } catch (e) {
+      logger.debug('getCurrentCommit encountered an error')
+    }
+    return null
+  }
+
+  const currentCommit = getCurrentCommit()
+
   try {
     // 从缓存获取
     const cacheKey = 'version_check_cache'
@@ -5192,6 +5252,7 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
           success: true,
           data: {
             current: currentVersion,
+            commit: currentCommit,
             latest: cachedData.latest,
             hasUpdate, // 实时计算，不用缓存
             releaseInfo: cachedData.releaseInfo,
@@ -5240,6 +5301,7 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
       success: true,
       data: {
         current: currentVersion,
+        commit: currentCommit,
         latest: latestVersion,
         hasUpdate,
         releaseInfo,
@@ -5269,6 +5331,7 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
         success: true,
         data: {
           current: currentVersion,
+          commit: currentCommit,
           latest: currentVersion,
           hasUpdate: false,
           releaseInfo: {
@@ -5296,6 +5359,7 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
           success: true,
           data: {
             current: currentVersion,
+            commit: currentCommit,
             latest: cachedData.latest,
             hasUpdate, // 实时计算
             releaseInfo: cachedData.releaseInfo,
@@ -5311,6 +5375,7 @@ router.get('/check-updates', authenticateAdmin, async (req, res) => {
       success: true,
       data: {
         current: currentVersion,
+        commit: currentCommit,
         latest: currentVersion,
         hasUpdate: false,
         releaseInfo: {

@@ -19,6 +19,11 @@ RUN npm run build
 # 🐳 主应用阶段
 FROM node:18-alpine
 
+# 🔖 Commit metadata injection
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
+LABEL org.opencontainers.image.revision="$GIT_COMMIT"
+
 # 📋 设置标签
 LABEL maintainer="claude-relay-service@example.com"
 LABEL description="Claude Code API Relay Service"
