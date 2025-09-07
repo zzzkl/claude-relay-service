@@ -298,6 +298,7 @@
                     </div>
                   </div>
                 </td>
+
                 <td class="px-3 py-4">
                   <div class="flex items-center gap-1">
                     <!-- 平台图标和名称 -->
@@ -342,6 +343,19 @@
                       }}</span>
                     </div>
                     <div
+                      v-else-if="account.platform === 'azure_openai'"
+                      class="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-100 to-cyan-100 px-2.5 py-1 dark:border-blue-700 dark:from-blue-900/20 dark:to-cyan-900/20"
+                    >
+                      <i class="fab fa-microsoft text-xs text-blue-700 dark:text-blue-400" />
+                      <span class="text-xs font-semibold text-blue-800 dark:text-blue-300"
+                        >Azure OpenAI</span
+                      >
+                      <span class="mx-1 h-4 w-px bg-blue-300 dark:bg-blue-600" />
+                      <span class="text-xs font-medium text-blue-700 dark:text-blue-400"
+                        >API Key</span
+                      >
+                    </div>
+                    <div
                       v-else-if="
                         account.platform === 'claude' || account.platform === 'claude-oauth'
                       "
@@ -357,15 +371,6 @@
                       </span>
                     </div>
                     <div
-                      v-else-if="account.platform === 'azure_openai'"
-                      class="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-100 to-cyan-100 px-2.5 py-1"
-                    >
-                      <i class="fab fa-microsoft text-xs text-blue-700" />
-                      <span class="text-xs font-semibold text-blue-800">Azure OpenAI</span>
-                      <span class="mx-1 h-4 w-px bg-blue-300" />
-                      <span class="text-xs font-medium text-blue-700">API Key</span>
-                    </div>
-                    <div
                       v-else
                       class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gradient-to-r from-gray-100 to-gray-200 px-2.5 py-1"
                     >
@@ -374,90 +379,82 @@
                     </div>
                   </div>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 align-top">
-                  <div class="flex flex-col gap-1">
-                    <span
-                      :class="[
-                        'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
-                        account.status === 'blocked'
-                          ? 'bg-orange-100 text-orange-800'
-                          : account.status === 'unauthorized'
-                            ? 'bg-red-100 text-red-800'
+                <td class="whitespace-nowrap px-3 py-4">
+                  <span
+                    :class="[
+                      'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
+                      account.status === 'blocked'
+                        ? 'bg-orange-100 text-orange-800'
+                        : account.status === 'unauthorized'
+                          ? 'bg-red-100 text-red-800'
+                          : account.status === 'temp_error'
+                            ? 'bg-orange-100 text-orange-800'
                             : account.isActive
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
-                      ]"
-                    >
-                      <div
-                        :class="[
-                          'mr-2 h-2 w-2 rounded-full',
-                          account.status === 'blocked'
-                            ? 'bg-orange-500'
-                            : account.status === 'unauthorized'
-                              ? 'bg-red-500'
+                    ]"
+                  >
+                    <div
+                      :class="[
+                        'mr-2 h-2 w-2 rounded-full',
+                        account.status === 'blocked'
+                          ? 'bg-orange-500'
+                          : account.status === 'unauthorized'
+                            ? 'bg-red-500'
+                            : account.status === 'temp_error'
+                              ? 'bg-orange-500'
                               : account.isActive
                                 ? 'bg-green-500'
                                 : 'bg-red-500'
-                        ]"
-                      />
-                      {{
-                        account.status === 'blocked'
-                          ? '已封锁'
-                          : account.status === 'unauthorized'
-                            ? '异常'
+                      ]"
+                    />
+                    {{
+                      account.status === 'blocked'
+                        ? '已封锁'
+                        : account.status === 'unauthorized'
+                          ? '异常'
+                          : account.status === 'temp_error'
+                            ? '临时异常'
                             : account.isActive
                               ? '正常'
                               : '异常'
-                      }}
-                    </span>
+                    }}
+                  </span>
+                  <span
+                    v-if="
+                      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
+                      account.rateLimitStatus === 'limited'
+                    "
+                    class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800"
+                  >
+                    <i class="fas fa-exclamation-triangle mr-1" />
+                    限流中
                     <span
                       v-if="
-                        (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
-                        account.rateLimitStatus === 'limited'
+                        account.rateLimitStatus &&
+                        typeof account.rateLimitStatus === 'object' &&
+                        account.rateLimitStatus.minutesRemaining > 0
                       "
-                      class="inline-flex items-center rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800"
+                      class="ml-1"
                     >
-                      <i class="fas fa-exclamation-triangle mr-1" />
-                      限流中
-                      <span
-                        v-if="
-                          account.rateLimitStatus &&
-                          typeof account.rateLimitStatus === 'object' &&
-                          account.rateLimitStatus.minutesRemaining > 0
-                        "
-                        >({{ account.rateLimitStatus.minutesRemaining }}分钟)</span
-                      >
+                      {{ account.rateLimitStatus.minutesRemaining }} 分钟后恢复
                     </span>
-                    <span
-                      v-if="account.schedulable === false"
-                      class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
-                    >
-                      <i class="fas fa-pause-circle mr-1" />
-                      不可调度
-                      <el-tooltip
-                        v-if="getSchedulableReason(account)"
-                        :content="getSchedulableReason(account)"
-                        effect="dark"
-                        placement="top"
-                      >
-                        <i class="fas fa-question-circle ml-1 cursor-help text-gray-500" />
-                      </el-tooltip>
-                    </span>
-                    <span
-                      v-if="account.status === 'blocked' && account.errorMessage"
-                      class="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400"
-                      :title="account.errorMessage"
-                    >
-                      {{ account.errorMessage }}
-                    </span>
-                    <span
-                      v-if="account.accountType === 'dedicated'"
-                      class="text-xs text-gray-500 dark:text-gray-400"
-                    >
-                      绑定: {{ account.boundApiKeysCount || 0 }} 个API Key
-                    </span>
-                  </div>
+                  </span>
+                  <span
+                    v-if="account.status === 'blocked' && account.errorMessage"
+                    class="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400"
+                    :title="account.errorMessage"
+                  >
+                    {{ account.errorMessage }}
+                  </span>
+                  <span
+                    v-if="account.accountType === 'dedicated'"
+                    class="text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    绑定: {{ account.boundApiKeysCount || 0 }} 个API Key
+                  </span>
                 </td>
+
                 <td class="whitespace-nowrap px-3 py-4">
                   <div
                     v-if="
@@ -639,6 +636,46 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- Claude Console: 显示每日额度使用进度 -->
+                  <div v-else-if="account.platform === 'claude-console'" class="space-y-2">
+                    <div v-if="Number(account.dailyQuota) > 0">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-600 dark:text-gray-300">额度进度</span>
+                        <span class="font-medium text-gray-700 dark:text-gray-200">
+                          {{ getQuotaUsagePercent(account).toFixed(1) }}%
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <div class="h-2 w-24 rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div
+                            :class="[
+                              'h-2 rounded-full transition-all duration-300',
+                              getQuotaBarClass(getQuotaUsagePercent(account))
+                            ]"
+                            :style="{ width: Math.min(100, getQuotaUsagePercent(account)) + '%' }"
+                          />
+                        </div>
+                        <span
+                          class="min-w-[32px] text-xs font-medium text-gray-700 dark:text-gray-200"
+                        >
+                          ${{ formatCost(account.usage?.daily?.cost || 0) }} / ${{
+                            Number(account.dailyQuota).toFixed(2)
+                          }}
+                        </span>
+                      </div>
+                      <div class="text-xs text-gray-600 dark:text-gray-400">
+                        剩余 ${{ formatRemainingQuota(account) }}
+                        <span class="ml-2 text-gray-400"
+                          >重置 {{ account.quotaResetTime || '00:00' }}</span
+                        >
+                      </div>
+                    </div>
+                    <div v-else class="text-sm text-gray-400">
+                      <i class="fas fa-minus" />
+                    </div>
+                  </div>
+
                   <!-- 无数据提示 -->
                   <div v-else class="text-xs text-gray-400">暂无数据</div>
                 </td>
@@ -1328,33 +1365,33 @@
           </div>
         </div>
       </div>
+
+      <!-- 添加账户模态框 -->
+      <AccountForm
+        v-if="showCreateAccountModal"
+        @close="showCreateAccountModal = false"
+        @success="handleCreateSuccess"
+      />
+
+      <!-- 编辑账户模态框 -->
+      <AccountForm
+        v-if="showEditAccountModal"
+        :account="editingAccount"
+        @close="showEditAccountModal = false"
+        @success="handleEditSuccess"
+      />
+
+      <!-- 确认弹窗 -->
+      <ConfirmModal
+        :cancel-text="confirmOptions.cancelText"
+        :confirm-text="confirmOptions.confirmText"
+        :message="confirmOptions.message"
+        :show="showConfirmModal"
+        :title="confirmOptions.title"
+        @cancel="handleCancel"
+        @confirm="handleConfirm"
+      />
     </div>
-
-    <!-- 添加账户模态框 -->
-    <AccountForm
-      v-if="showCreateAccountModal"
-      @close="showCreateAccountModal = false"
-      @success="handleCreateSuccess"
-    />
-
-    <!-- 编辑账户模态框 -->
-    <AccountForm
-      v-if="showEditAccountModal"
-      :account="editingAccount"
-      @close="showEditAccountModal = false"
-      @success="handleEditSuccess"
-    />
-
-    <!-- 确认弹窗 -->
-    <ConfirmModal
-      :cancel-text="confirmOptions.cancelText"
-      :confirm-text="confirmOptions.confirmText"
-      :message="confirmOptions.message"
-      :show="showConfirmModal"
-      :title="confirmOptions.title"
-      @cancel="handleCancel"
-      @confirm="handleConfirm"
-    />
   </div>
 </template>
 
@@ -2179,6 +2216,9 @@ const getSchedulableReason = (account) => {
     if (account.status === 'unauthorized') {
       return '认证失败（401错误）'
     }
+    if (account.status === 'temp_error' && account.errorMessage) {
+      return account.errorMessage
+    }
     if (account.status === 'error' && account.errorMessage) {
       return account.errorMessage
     }
@@ -2217,6 +2257,8 @@ const getAccountStatusText = (account) => {
     account.rateLimitStatus === 'limited'
   )
     return '限流中'
+  // 检查是否临时错误
+  if (account.status === 'temp_error') return '临时异常'
   // 检查是否错误
   if (account.status === 'error' || !account.isActive) return '错误'
   // 检查是否可调度
@@ -2239,6 +2281,9 @@ const getAccountStatusClass = (account) => {
     (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
     account.rateLimitStatus === 'limited'
   ) {
+    return 'bg-orange-100 text-orange-800'
+  }
+  if (account.status === 'temp_error') {
     return 'bg-orange-100 text-orange-800'
   }
   if (account.status === 'error' || !account.isActive) {
@@ -2264,6 +2309,9 @@ const getAccountStatusDotClass = (account) => {
     (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
     account.rateLimitStatus === 'limited'
   ) {
+    return 'bg-orange-500'
+  }
+  if (account.status === 'temp_error') {
     return 'bg-orange-500'
   }
   if (account.status === 'error' || !account.isActive) {
@@ -2305,6 +2353,29 @@ const formatCost = (cost) => {
   if (cost < 0.01) return cost.toFixed(6)
   if (cost < 1) return cost.toFixed(4)
   return cost.toFixed(2)
+}
+
+// 额度使用百分比（Claude Console）
+const getQuotaUsagePercent = (account) => {
+  const used = Number(account?.usage?.daily?.cost || 0)
+  const quota = Number(account?.dailyQuota || 0)
+  if (!quota || quota <= 0) return 0
+  return (used / quota) * 100
+}
+
+// 额度进度条颜色（Claude Console）
+const getQuotaBarClass = (percent) => {
+  if (percent >= 90) return 'bg-red-500'
+  if (percent >= 70) return 'bg-yellow-500'
+  return 'bg-green-500'
+}
+
+// 剩余额度（Claude Console）
+const formatRemainingQuota = (account) => {
+  const used = Number(account?.usage?.daily?.cost || 0)
+  const quota = Number(account?.dailyQuota || 0)
+  if (!quota || quota <= 0) return '0.00'
+  return Math.max(0, quota - used).toFixed(2)
 }
 
 // 计算每日费用（使用后端返回的精确费用数据）
