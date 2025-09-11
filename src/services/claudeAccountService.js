@@ -607,6 +607,25 @@ class ClaudeAccountService {
 
       updatedData.updatedAt = new Date().toISOString()
 
+      // 如果是手动修改调度状态，清除所有自动停止相关的字段
+      if (Object.prototype.hasOwnProperty.call(updates, 'schedulable')) {
+        // 清除所有自动停止的标记，防止自动恢复
+        delete updatedData.rateLimitAutoStopped
+        delete updatedData.fiveHourAutoStopped
+        delete updatedData.fiveHourStoppedAt
+        delete updatedData.tempErrorAutoStopped
+        // 兼容旧的标记（逐步迁移）
+        delete updatedData.autoStoppedAt
+        delete updatedData.stoppedReason
+
+        // 如果是手动启用调度，记录日志
+        if (updates.schedulable === true || updates.schedulable === 'true') {
+          logger.info(`✅ Manually enabled scheduling for account ${accountId}`)
+        } else {
+          logger.info(`⛔ Manually disabled scheduling for account ${accountId}`)
+        }
+      }
+
       // 检查是否手动禁用了账号，如果是则发送webhook通知
       if (updates.isActive === 'false' && accountData.isActive === 'true') {
         try {
@@ -1092,7 +1111,9 @@ class ClaudeAccountService {
       updatedAccountData.rateLimitedAt = new Date().toISOString()
       updatedAccountData.rateLimitStatus = 'limited'
       // 限流时停止调度，与 OpenAI 账号保持一致
-      updatedAccountData.schedulable = false
+      updatedAccountData.schedulable = 'false'
+      // 使用独立的限流自动停止标记，避免与其他自动停止冲突
+      updatedAccountData.rateLimitAutoStopped = 'true'
 
       // 如果提供了准确的限流重置时间戳（来自API响应头）
       if (rateLimitResetTimestamp) {
@@ -1177,13 +1198,16 @@ class ClaudeAccountService {
       delete accountData.rateLimitedAt
       delete accountData.rateLimitStatus
       delete accountData.rateLimitEndAt // 清除限流结束时间
-      // 恢复可调度状态，与 OpenAI 账号保持一致
-      accountData.schedulable = true
+
+      // 只恢复因限流而自动停止的账户
+      if (accountData.rateLimitAutoStopped === 'true' && accountData.schedulable === 'false') {
+        accountData.schedulable = 'true'
+        delete accountData.rateLimitAutoStopped
+        logger.info(`✅ Auto-resuming scheduling for account ${accountId} after rate limit cleared`)
+      }
       await redis.setClaudeAccount(accountId, accountData)
 
-      logger.success(
-        `✅ Rate limit removed for account: ${accountData.name} (${accountId}), schedulable restored`
-      )
+      logger.success(`✅ Rate limit removed for account: ${accountData.name} (${accountId})`)
 
       return { success: true }
     } catch (error) {
@@ -1335,17 +1359,13 @@ class ClaudeAccountService {
       }
 
       // 如果账户因为5小时限制被自动停止，现在恢复调度
-      if (
-        accountData.autoStoppedAt &&
-        accountData.schedulable === 'false' &&
-        accountData.stoppedReason === '5小时使用量接近限制，自动停止调度'
-      ) {
+      if (accountData.fiveHourAutoStopped === 'true' && accountData.schedulable === 'false') {
         logger.info(
           `✅ Auto-resuming scheduling for account ${accountData.name} (${accountId}) - new session window started`
         )
         accountData.schedulable = 'true'
-        delete accountData.stoppedReason
-        delete accountData.autoStoppedAt
+        delete accountData.fiveHourAutoStopped
+        delete accountData.fiveHourStoppedAt
 
         // 发送Webhook通知
         try {
@@ -1942,8 +1962,16 @@ class ClaudeAccountService {
         updatedAccountData.status = 'created'
       }
 
-      // 恢复可调度状态
+      // 恢复可调度状态（管理员手动重置时恢复调度是合理的）
       updatedAccountData.schedulable = 'true'
+      // 清除所有自动停止相关的标记
+      delete updatedAccountData.rateLimitAutoStopped
+      delete updatedAccountData.fiveHourAutoStopped
+      delete updatedAccountData.fiveHourStoppedAt
+      delete updatedAccountData.tempErrorAutoStopped
+      // 兼容旧的标记
+      delete updatedAccountData.autoStoppedAt
+      delete updatedAccountData.stoppedReason
 
       // 清除错误相关字段
       delete updatedAccountData.errorMessage
@@ -1969,7 +1997,15 @@ class ClaudeAccountService {
         'rateLimitEndAt',
         'tempErrorAt',
         'sessionWindowStart',
-        'sessionWindowEnd'
+        'sessionWindowEnd',
+        // 新的独立标记
+        'rateLimitAutoStopped',
+        'fiveHourAutoStopped',
+        'fiveHourStoppedAt',
+        'tempErrorAutoStopped',
+        // 兼容旧的标记
+        'autoStoppedAt',
+        'stoppedReason'
       ]
       await redis.client.hdel(`claude:account:${accountId}`, ...fieldsToDelete)
 
@@ -2020,13 +2056,22 @@ class ClaudeAccountService {
           // 如果临时错误状态超过指定时间，尝试重新激活
           if (minutesSinceTempError > TEMP_ERROR_RECOVERY_MINUTES) {
             account.status = 'active' // 恢复为 active 状态
-            account.schedulable = 'true' // 恢复为可调度
+            // 只恢复因临时错误而自动停止的账户
+            if (account.tempErrorAutoStopped === 'true') {
+              account.schedulable = 'true' // 恢复为可调度
+              delete account.tempErrorAutoStopped
+            }
             delete account.errorMessage
             delete account.tempErrorAt
             await redis.setClaudeAccount(account.id, account)
 
             // 显式从 Redis 中删除这些字段（因为 HSET 不会删除现有字段）
-            await redis.client.hdel(`claude:account:${account.id}`, 'errorMessage', 'tempErrorAt')
+            await redis.client.hdel(
+              `claude:account:${account.id}`,
+              'errorMessage',
+              'tempErrorAt',
+              'tempErrorAutoStopped'
+            )
 
             // 同时清除500错误计数
             await this.clearInternalErrors(account.id)
@@ -2111,6 +2156,8 @@ class ClaudeAccountService {
       updatedAccountData.schedulable = 'false' // 设置为不可调度
       updatedAccountData.errorMessage = 'Account temporarily disabled due to consecutive 500 errors'
       updatedAccountData.tempErrorAt = new Date().toISOString()
+      // 使用独立的临时错误自动停止标记
+      updatedAccountData.tempErrorAutoStopped = 'true'
 
       // 保存更新后的账户数据
       await redis.setClaudeAccount(accountId, updatedAccountData)
@@ -2129,7 +2176,11 @@ class ClaudeAccountService {
               if (minutesSince >= 5) {
                 // 恢复账户
                 account.status = 'active'
-                account.schedulable = 'true'
+                // 只恢复因临时错误而自动停止的账户
+                if (account.tempErrorAutoStopped === 'true') {
+                  account.schedulable = 'true'
+                  delete account.tempErrorAutoStopped
+                }
                 delete account.errorMessage
                 delete account.tempErrorAt
 
@@ -2139,7 +2190,8 @@ class ClaudeAccountService {
                 await redis.client.hdel(
                   `claude:account:${accountId}`,
                   'errorMessage',
-                  'tempErrorAt'
+                  'tempErrorAt',
+                  'tempErrorAutoStopped'
                 )
 
                 // 清除 500 错误计数
@@ -2227,8 +2279,9 @@ class ClaudeAccountService {
           `⚠️ Account ${accountData.name} (${accountId}) approaching 5h limit, auto-stopping scheduling`
         )
         accountData.schedulable = 'false'
-        accountData.stoppedReason = '5小时使用量接近限制，自动停止调度'
-        accountData.autoStoppedAt = new Date().toISOString()
+        // 使用独立的5小时限制自动停止标记
+        accountData.fiveHourAutoStopped = 'true'
+        accountData.fiveHourStoppedAt = new Date().toISOString()
 
         // 发送Webhook通知
         try {
@@ -2254,6 +2307,108 @@ class ClaudeAccountService {
       )
     } catch (error) {
       logger.error(`❌ Failed to update session window status for account ${accountId}:`, error)
+    }
+  }
+
+  // 🚫 标记账号为过载状态（529错误）
+  async markAccountOverloaded(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData) {
+        throw new Error('Account not found')
+      }
+
+      // 获取配置的过载处理时间（分钟）
+      const overloadMinutes = config.overloadHandling?.enabled || 0
+
+      if (overloadMinutes === 0) {
+        logger.info('⏭️ 529 error handling is disabled')
+        return { success: false, error: '529 error handling is disabled' }
+      }
+
+      const overloadKey = `account:overload:${accountId}`
+      const ttl = overloadMinutes * 60 // 转换为秒
+
+      await redis.setex(
+        overloadKey,
+        ttl,
+        JSON.stringify({
+          accountId,
+          accountName: accountData.name,
+          markedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + ttl * 1000).toISOString()
+        })
+      )
+
+      logger.warn(
+        `🚫 Account ${accountData.name} (${accountId}) marked as overloaded for ${overloadMinutes} minutes`
+      )
+
+      // 在账号上记录最后一次529错误
+      const updates = {
+        lastOverloadAt: new Date().toISOString(),
+        errorMessage: `529错误 - 过载${overloadMinutes}分钟`
+      }
+
+      const updatedAccountData = { ...accountData, ...updates }
+      await redis.setClaudeAccount(accountId, updatedAccountData)
+
+      return { success: true, accountName: accountData.name, duration: overloadMinutes }
+    } catch (error) {
+      logger.error(`❌ Failed to mark account as overloaded: ${accountId}`, error)
+      // 不抛出错误，避免影响主请求流程
+      return { success: false, error: error.message }
+    }
+  }
+
+  // ✅ 检查账号是否过载
+  async isAccountOverloaded(accountId) {
+    try {
+      // 如果529处理未启用，直接返回false
+      const overloadMinutes = config.overloadHandling?.enabled || 0
+      if (overloadMinutes === 0) {
+        return false
+      }
+
+      const overloadKey = `account:overload:${accountId}`
+      const overloadData = await redis.get(overloadKey)
+
+      if (overloadData) {
+        // 账号处于过载状态
+        return true
+      }
+
+      // 账号未过载
+      return false
+    } catch (error) {
+      logger.error(`❌ Failed to check if account is overloaded: ${accountId}`, error)
+      return false
+    }
+  }
+
+  // 🔄 移除账号的过载状态
+  async removeAccountOverload(accountId) {
+    try {
+      const accountData = await redis.getClaudeAccount(accountId)
+      if (!accountData) {
+        throw new Error('Account not found')
+      }
+
+      const overloadKey = `account:overload:${accountId}`
+      await redis.del(overloadKey)
+
+      logger.info(`✅ Account ${accountData.name} (${accountId}) overload status removed`)
+
+      // 清理账号上的错误信息
+      if (accountData.errorMessage && accountData.errorMessage.includes('529错误')) {
+        const updatedAccountData = { ...accountData }
+        delete updatedAccountData.errorMessage
+        delete updatedAccountData.lastOverloadAt
+        await redis.setClaudeAccount(accountId, updatedAccountData)
+      }
+    } catch (error) {
+      logger.error(`❌ Failed to remove overload status for account: ${accountId}`, error)
+      // 不抛出错误，移除过载状态失败不应该影响主流程
     }
   }
 }
