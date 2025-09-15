@@ -273,32 +273,37 @@
                         >
                           <i class="fas fa-share-alt mr-1" />共享
                         </span>
-                        <!-- 分组标签：支持多分组显示，回退到单分组字段 -->
-                        <template v-if="account.groupInfos && account.groupInfos.length">
-                          <span
-                            v-for="group in account.groupInfos"
-                            :key="group.id"
-                            class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                            :title="`所属分组: ${group.name}`"
-                          >
-                            <i class="fas fa-folder mr-1" />{{ group.name }}
-                          </span>
-                        </template>
+                      </div>
+                      <!-- 显示所有分组 - 换行显示；若无多分组则回退到单分组字段 -->
+                      <div
+                        v-if="account.groupInfos && account.groupInfos.length > 0"
+                        class="my-2 flex flex-wrap items-center gap-2"
+                      >
                         <span
-                          v-else-if="account.groupInfo"
-                          class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"
-                          :title="`所属分组: ${account.groupInfo.name}`"
+                          v-for="group in account.groupInfos"
+                          :key="group.id"
+                          class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                          :title="`所属分组: ${group.name}`"
                         >
-                          <i class="fas fa-folder mr-1" />{{ account.groupInfo.name }}
+                          <i class="fas fa-folder mr-1" />{{ group.name }}
                         </span>
                       </div>
-                      <div class="truncate text-xs text-gray-500" :title="account.id">
+                      <span
+                        v-else-if="account.groupInfo"
+                        class="my-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                        :title="`所属分组: ${account.groupInfo.name}`"
+                      >
+                        <i class="fas fa-folder mr-1" />{{ account.groupInfo.name }}
+                      </span>
+                      <div
+                        class="truncate text-xs text-gray-500 dark:text-gray-400"
+                        :title="account.id"
+                      >
                         {{ account.id }}
                       </div>
                     </div>
                   </div>
                 </td>
-
                 <td class="px-3 py-4">
                   <div class="flex items-center gap-1">
                     <!-- 平台图标和名称 -->
@@ -462,11 +467,23 @@
                           typeof account.rateLimitStatus === 'object' &&
                           account.rateLimitStatus.minutesRemaining > 0
                         "
-                        class="ml-1"
+                        >({{ formatRateLimitTime(account.rateLimitStatus.minutesRemaining) }})</span
                       >
-                        ({{ formatRateLimitTime(account.rateLimitStatus.minutesRemaining) }})
-                        {{ account.rateLimitStatus.minutesRemaining }} 分钟后恢复
-                      </span>
+                    </span>
+                    <span
+                      v-if="account.schedulable === false"
+                      class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700"
+                    >
+                      <i class="fas fa-pause-circle mr-1" />
+                      不可调度
+                      <el-tooltip
+                        v-if="getSchedulableReason(account)"
+                        :content="getSchedulableReason(account)"
+                        effect="dark"
+                        placement="top"
+                      >
+                        <i class="fas fa-question-circle ml-1 cursor-help text-gray-500" />
+                      </el-tooltip>
                     </span>
                     <span
                       v-if="account.status === 'blocked' && account.errorMessage"
@@ -483,7 +500,6 @@
                     </span>
                   </div>
                 </td>
-                <!-- Priority column -->
                 <td class="whitespace-nowrap px-3 py-4">
                   <div
                     v-if="
@@ -492,6 +508,7 @@
                       account.platform === 'bedrock' ||
                       account.platform === 'gemini' ||
                       account.platform === 'openai' ||
+                      account.platform === 'openai-responses' ||
                       account.platform === 'azure_openai' ||
                       account.platform === 'ccr'
                     "
@@ -1122,7 +1139,7 @@
                 <div
                   :class="[
                     'h-full transition-all duration-300',
-                    getSessionProgressBarClass(account.sessionWindow.sessionWindowStatus)
+                    getSessionProgressBarClass(account.sessionWindow.sessionWindowStatus, account)
                   ]"
                   :style="{ width: account.sessionWindow.progress + '%' }"
                 />
@@ -1728,9 +1745,12 @@ const loadAccounts = async (forceReload = false) => {
 
     if (claudeConsoleData.success) {
       const claudeConsoleAccounts = (claudeConsoleData.data || []).map((acc) => {
-        // Claude Console账户暂时不支持直接绑定
+        // 计算每个Claude Console账户绑定的API Key数量
+        const boundApiKeysCount = apiKeys.value.filter(
+          (key) => key.claudeConsoleAccountId === acc.id
+        ).length
         // 后端已经包含了groupInfos，直接使用
-        return { ...acc, platform: 'claude-console', boundApiKeysCount: 0 }
+        return { ...acc, platform: 'claude-console', boundApiKeysCount }
       })
       allAccounts.push(...claudeConsoleAccounts)
     }
@@ -2017,8 +2037,11 @@ const deleteAccount = async (account) => {
   const boundKeysCount = apiKeys.value.filter(
     (key) =>
       key.claudeAccountId === account.id ||
+      key.claudeConsoleAccountId === account.id ||
       key.geminiAccountId === account.id ||
-      key.openaiAccountId === account.id
+      key.openaiAccountId === account.id ||
+      key.azureOpenaiAccountId === account.id ||
+      key.openaiAccountId === `responses:${account.id}`
   ).length
 
   if (boundKeysCount > 0) {
@@ -2539,8 +2562,27 @@ const formatRelativeTime = (dateString) => {
 }
 
 // 获取会话窗口进度条的样式类
-const getSessionProgressBarClass = (status) => {
-  if (!status) return 'bg-gradient-to-r from-blue-500 to-indigo-600'
+const getSessionProgressBarClass = (status, account = null) => {
+  // 根据状态返回不同的颜色类，包含防御性检查
+  if (!status) {
+    // 无状态信息时默认为蓝色
+    return 'bg-gradient-to-r from-blue-500 to-indigo-600'
+  }
+
+  // 检查账号是否处于限流状态
+  const isRateLimited =
+    account &&
+    (account.isRateLimited ||
+      account.status === 'rate_limited' ||
+      (account.rateLimitStatus && account.rateLimitStatus.isRateLimited) ||
+      account.rateLimitStatus === 'limited')
+
+  // 如果账号处于限流状态，显示红色
+  if (isRateLimited) {
+    return 'bg-gradient-to-r from-red-500 to-red-600'
+  }
+
+  // 转换为小写进行比较，避免大小写问题
   const normalizedStatus = String(status).toLowerCase()
   if (normalizedStatus === 'rejected') return 'bg-gradient-to-r from-red-500 to-red-600'
   if (normalizedStatus === 'allowed_warning')
