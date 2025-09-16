@@ -548,9 +548,9 @@
                     </div>
                     <div class="flex items-center gap-2">
                       <div class="h-2 w-2 rounded-full bg-purple-500" />
-                      <span class="text-xs text-gray-600 dark:text-gray-300"
-                        >{{ formatNumber(account.usage.daily.allTokens || 0) }}M</span
-                      >
+                      <span class="text-xs text-gray-600 dark:text-gray-300">{{
+                        formatTokenCount(account.usage.daily.allTokens || 0)
+                      }}</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <div class="h-2 w-2 rounded-full bg-green-500" />
@@ -2301,18 +2301,6 @@ const calculateModelCost = (stat) => {
 
   // 默认返回
   return '$0.000000'
-}
-
-// 格式化数字（用于token显示）
-const formatNumber = (num) => {
-  if (!num) return '0'
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(2)
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K'
-  }
-  return num.toString()
 }
 
 // 格式化Token计数

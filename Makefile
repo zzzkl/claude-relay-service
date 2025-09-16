@@ -16,7 +16,7 @@ YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m # No Color
 
-.PHONY: help install setup dev start test lint lint-web lint-all format format-web format-all clean docker-up docker-down service-start service-stop service-status logs cli-admin cli-keys cli-accounts cli-status
+.PHONY: help install setup dev dev-web start test lint lint-web lint-all format format-web format-all clean docker-up docker-down service-start service-stop service-status logs cli-admin cli-keys cli-accounts cli-status
 
 # 默认目标：显示帮助信息
 help:
@@ -35,6 +35,9 @@ help:
 	@echo "    build-all      - 构建完整项目（后端+前端）"
 	@echo "    lint-web       - Web 代码风格检查 (ESLint)"
 	@echo "    format-web     - Web 代码格式化 (Prettier)"
+	@echo ""
+	@echo "  🧩 前端开发："
+	@echo "    dev-web        - 启动 Web 开发服务器 (Vite，默认 http://localhost:3001/admin/)"
 	@echo ""
 	@echo "  🚀 开发和运行："
 	@echo "    dev            - 开发模式运行（热重载）"
@@ -106,6 +109,10 @@ clean:
 dev:
 	@echo "🚀 启动开发模式（热重载）..."
 	npm run dev
+
+dev-web:
+	@echo "🎨 启动 Web 开发服务器 (Vite)..."
+	cd web/admin-spa && npm run dev
 
 start:
 	@echo "🚀 启动生产模式..."
