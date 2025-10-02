@@ -10,6 +10,7 @@ const logger = require('../utils/logger')
 const config = require('../../config/config')
 const claudeCodeHeadersService = require('./claudeCodeHeadersService')
 const redis = require('../models/redis')
+const ClaudeCodeValidator = require('../validators/clients/claudeCodeValidator')
 
 class ClaudeRelayService {
   constructor() {
@@ -22,41 +23,16 @@ class ClaudeRelayService {
 
   // 🔍 判断是否是真实的 Claude Code 请求
   isRealClaudeCodeRequest(requestBody, clientHeaders) {
-    // 检查 user-agent 是否匹配 Claude Code 格式
-    const userAgent = clientHeaders?.['user-agent'] || clientHeaders?.['User-Agent'] || ''
-    const isClaudeCodeUserAgent = /^claude-cli\/[\d.]+\s+\(/i.test(userAgent)
-
-    // 检查系统提示词是否包含 Claude Code 标识
-    const hasClaudeCodeSystemPrompt = this._hasClaudeCodeSystemPrompt(requestBody)
-
-    // 只有当 user-agent 匹配且系统提示词正确时，才认为是真实的 Claude Code 请求
-    return isClaudeCodeUserAgent && hasClaudeCodeSystemPrompt
-  }
-
-  // 🔍 检查请求中是否包含 Claude Code 系统提示词
-  _hasClaudeCodeSystemPrompt(requestBody) {
-    if (!requestBody || !requestBody.system) {
-      return false
+    // 使用 claudeCodeValidator 来进行完整的验证
+    // 注意：claudeCodeValidator.validate() 需要一个完整的 req 对象
+    // 我们需要构造一个最小化的 req 对象来满足验证器的需求
+    const mockReq = {
+      headers: clientHeaders || {},
+      body: requestBody,
+      path: '/api/v1/messages'
     }
 
-    // 如果是字符串格式，一定不是真实的 Claude Code 请求
-    if (typeof requestBody.system === 'string') {
-      return false
-    }
-
-    // 处理数组格式
-    if (Array.isArray(requestBody.system) && requestBody.system.length > 0) {
-      const firstItem = requestBody.system[0]
-      // 检查第一个元素是否包含 Claude Code 提示词
-      return (
-        firstItem &&
-        firstItem.type === 'text' &&
-        firstItem.text &&
-        firstItem.text === this.claudeCodeSystemPrompt
-      )
-    }
-
-    return false
+    return ClaudeCodeValidator.validate(mockReq)
   }
 
   // 🚀 转发请求到Claude API
@@ -709,14 +685,12 @@ class ClaudeRelayService {
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        const userAgent = unifiedUA || 'claude-cli/1.0.57 (external, cli)'
-        options.headers['User-Agent'] = userAgent
+      if (!options.headers['user-agent'] || unifiedUA !== null) {
+        const userAgent = unifiedUA || 'claude-cli/1.0.119 (external, cli)'
+        options.headers['user-agent'] = userAgent
       }
 
-      logger.info(
-        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
-      )
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
 
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
@@ -950,14 +924,12 @@ class ClaudeRelayService {
       }
 
       // 使用统一 User-Agent 或客户端提供的，最后使用默认值
-      if (!options.headers['User-Agent'] && !options.headers['user-agent']) {
-        const userAgent = unifiedUA || 'claude-cli/1.0.57 (external, cli)'
-        options.headers['User-Agent'] = userAgent
+      if (!options.headers['user-agent'] || unifiedUA !== null) {
+        const userAgent = unifiedUA || 'claude-cli/1.0.119 (external, cli)'
+        options.headers['user-agent'] = userAgent
       }
 
-      logger.info(
-        `🔗 指纹是这个: ${options.headers['User-Agent'] || options.headers['user-agent']}`
-      )
+      logger.info(`🔗 指纹是这个: ${options.headers['user-agent']}`)
       // 使用自定义的 betaHeader 或默认值
       const betaHeader =
         requestOptions?.betaHeader !== undefined ? requestOptions.betaHeader : this.betaHeader
@@ -1618,7 +1590,7 @@ class ClaudeRelayService {
   }
 
   // 🛠️ 统一的错误处理方法
-  async _handleServerError(accountId, statusCode, sessionHash = null, context = '') {
+  async _handleServerError(accountId, statusCode, _sessionHash = null, context = '') {
     try {
       await claudeAccountService.recordServerError(accountId, statusCode)
       const errorCount = await claudeAccountService.getServerErrorCount(accountId)
@@ -1634,10 +1606,10 @@ class ClaudeRelayService {
 
       if (errorCount > threshold) {
         const errorTypeLabel = isTimeout ? 'timeout' : '5xx'
+        // ⚠️ 只记录5xx/504告警，不再自动停止调度，避免上游抖动导致误停
         logger.error(
-          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount} errors), marking as temp_error`
+          `❌ ${prefix}Account ${accountId} exceeded ${errorTypeLabel} error threshold (${errorCount} errors), please investigate upstream stability`
         )
-        await claudeAccountService.markAccountTempError(accountId, sessionHash)
       }
     } catch (handlingError) {
       logger.error(`❌ Failed to handle ${context} server error:`, handlingError)
